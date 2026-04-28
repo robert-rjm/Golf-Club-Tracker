@@ -218,7 +218,7 @@
 
   /* ── BOTTOM BAR ── */
   .bottom-bar {
-    padding: 10px 18px 20px;
+    padding: 10px 18px calc(20px + env(safe-area-inset-bottom));
     border-top: 1px solid var(--border);
     display: flex; gap: 8px; flex-shrink: 0;
     background: rgba(15,26,13,0.5);
@@ -245,7 +245,7 @@
     position: fixed; inset: 0; z-index: 100;
     background: rgba(8,13,7,0.97);
     display: none; flex-direction: column;
-    padding: 22px 20px 24px;
+    padding: 22px 20px calc(24px + env(safe-area-inset-bottom));
   }
   .overlay.open { display: flex; }
   .ov-head {
@@ -338,6 +338,15 @@
     cursor: pointer; letter-spacing: 0.5px;
   }
   .settings-start-btn:active { background: var(--fairway); }
+
+  /* ── FOOTNOTE ── */
+  .footnote {
+    text-align: center;
+    font-size: 10px; letter-spacing: 1px;
+    color: rgba(255,255,255,0.15);
+    padding: 6px 0 4px;
+    flex-shrink: 0;
+  }
 </style>
 </head>
 <body>
@@ -366,6 +375,8 @@
   </div>
 
   <div class="clubs-area" id="clubsArea"></div>
+
+  <div class="footnote">© 2026 Robert Michels</div>
 
   <div class="bottom-bar">
     <button class="undo-btn" id="undoBtn">↩ Undo</button>
@@ -402,7 +413,7 @@ const ALL_CLUBS = {
   'Wedges':         ['PW', 'PA', 'GW', 'AW', 'SW', 'LW']
 };
 
-// Robert's default bag — loaded on every fresh page open
+// My default bag — loaded on every fresh page open
 const DEFAULT_BAG = ['D', '5W', '5H', '5i', '6i', '7i', '8i', '9i', 'PW', 'PA', 'AW', 'SW'];
 
 let activeBag = [...DEFAULT_BAG];
