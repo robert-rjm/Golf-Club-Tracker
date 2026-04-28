@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>ClubTrack</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Karla:ital,wght@0,400;0,600;0,700;1,400&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --green:       #243d20;
+    --green-mid:   #2e5228;
+    --fairway:     #3d7033;
+    --turf:        #4d8f41;
+    --cream:       #ede8db;
+    --cream-dim:   #b8b0a0;
+    --dark:        #0f1a0d;
+    --dark2:       #182516;
+    --gold:        #c9a84c;
+    --gold-bright: #e8c96a;
+    --red:         #b03020;
+    --border:      rgba(255,255,255,0.07);
+    --border-gold: rgba(201,168,76,0.25);
+  }
+
+  html, body {
+    height: 100%; overflow: hidden;
+    background: var(--dark);
+    color: var(--cream);
+    font-family: 'Karla', sans-serif;
+  }
+
+  /* Subtle grass-texture via layered radials */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse 80% 60% at 15% -10%, rgba(61,112,51,0.35) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 50% at 90% 110%, rgba(45,90,39,0.2) 0%, transparent 60%),
+      repeating-linear-gradient(
+        170deg,
+        transparent 0px,
+        transparent 18px,
+        rgba(255,255,255,0.012) 18px,
+        rgba(255,255,255,0.012) 19px
+      );
+  }
+
+  .app {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column;
+    height: 100vh;
+    max-width: 430px; margin: 0 auto;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    padding: 14px 18px 11px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border-gold);
+    background: rgba(15,26,13,0.6);
+    backdrop-filter: blur(8px);
+    flex-shrink: 0;
+  }
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 21px; letter-spacing: 3px; color: var(--gold);
+    display: flex; align-items: center; gap: 7px;
+  }
+  .logo-flag { font-size: 17px; }
+  .hole-nav { display: flex; align-items: center; gap: 6px; }
+  .nav-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--cream); font-size: 20px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.1s; user-select: none;
+  }
+  .nav-btn:active { background: rgba(201,168,76,0.2); transform: scale(0.86); }
+  .hole-display {
+    min-width: 80px; text-align: center;
+  }
+  .hole-word {
+    font-size: 9px; font-weight: 600; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--cream-dim); display: block;
+  }
+  .hole-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px; letter-spacing: 1px; color: var(--cream);
+    line-height: 1;
+  }
+
+  /* ── HOLE STRIP ── */
+  .strip-wrap {
+    padding: 7px 18px 6px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    background: rgba(15,26,13,0.4);
+  }
+  .strip {
+    display: flex; gap: 4px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .strip::-webkit-scrollbar { display: none; }
+  .chip {
+    flex-shrink: 0;
+    width: 26px; height: 26px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+    cursor: pointer; transition: all 0.12s;
+    border: 1.5px solid transparent;
+    background: rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.3);
+  }
+  .chip.logged {
+    background: rgba(61,112,51,0.55);
+    color: var(--cream);
+  }
+  .chip.active {
+    border-color: var(--gold);
+    color: var(--gold);
+    background: rgba(201,168,76,0.12);
+  }
+
+  /* ── SHOT LOG ── */
+  .shot-log {
+    padding: 8px 18px;
+    min-height: 58px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .log-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--cream-dim);
+  }
+  .shots-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .shot-pill {
+    background: rgba(45,82,40,0.7);
+    border: 1px solid rgba(77,143,65,0.5);
+    border-radius: 20px; padding: 3px 8px 3px 7px;
+    font-size: 13px; font-weight: 600; color: var(--cream);
+    display: inline-flex; align-items: center; gap: 4px;
+    animation: pop 0.16s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  @keyframes pop {
+    from { transform: scale(0.5); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+  .pill-num { font-size: 9px; color: var(--gold); font-weight: 700; }
+  .pill-x {
+    background: none; border: none;
+    color: rgba(255,255,255,0.25); cursor: pointer;
+    font-size: 11px; padding: 0; line-height: 1;
+    transition: color 0.1s;
+  }
+  .pill-x:active { color: #e05040; }
+  .no-shots { color: rgba(255,255,255,0.25); font-size: 12px; font-style: italic; }
+
+  /* ── CLUB GRID ── */
+  .clubs-area {
+    flex: 1; overflow-y: auto; scrollbar-width: none;
+    padding: 10px 18px 10px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .clubs-area::-webkit-scrollbar { display: none; }
+
+  .group { display: flex; flex-direction: column; gap: 6px; }
+  .group-title {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: rgba(201,168,76,0.5);
+  }
+  .grid { display: grid; gap: 7px; }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .grid-5 { grid-template-columns: repeat(5, 1fr); }
+  .grid-1 { grid-template-columns: 1fr; }
+
+  .cbt {
+    background: rgba(255,255,255,0.055);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 13px;
+    color: var(--cream);
+    font-family: 'Karla', sans-serif;
+    font-size: 16px; font-weight: 700;
+    padding: 15px 6px;
+    cursor: pointer; text-align: center;
+    transition: transform 0.08s, background 0.08s, border-color 0.08s;
+    user-select: none; position: relative; overflow: hidden;
+  }
+  .cbt:active {
+    transform: scale(0.88);
+    background: rgba(77,143,65,0.55);
+    border-color: var(--turf);
+  }
+  .cbt.putter-btn {
+    font-size: 14px;
+    background: rgba(201,168,76,0.08);
+    border-color: rgba(201,168,76,0.18);
+    color: var(--gold);
+  }
+  .cbt.putter-btn:active { background: rgba(201,168,76,0.3); }
+  .cbt.flash { animation: cflash 0.38s ease forwards; }
+  @keyframes cflash {
+    0%   { background: rgba(201,168,76,0.5); border-color: var(--gold-bright); }
+    100% { background: rgba(255,255,255,0.055); border-color: rgba(255,255,255,0.09); }
+  }
+  .cbt.putter-btn.flash { animation: pflash 0.38s ease forwards; }
+  @keyframes pflash {
+    0%   { background: rgba(201,168,76,0.55); border-color: var(--gold-bright); }
+    100% { background: rgba(201,168,76,0.08); border-color: rgba(201,168,76,0.18); }
+  }
+
+  /* ── PUTTER STEPPER ── */
+  .putter-stepper {
+    display: flex; align-items: center; gap: 0;
+    background: rgba(201,168,76,0.08);
+    border: 1px solid rgba(201,168,76,0.22);
+    border-radius: 13px; overflow: hidden;
+    height: 52px;
+  }
+  .putter-step-btn {
+    flex: 0 0 56px; height: 100%;
+    background: none; border: none;
+    color: var(--gold); font-size: 26px; font-weight: 300;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.1s;
+    user-select: none;
+  }
+  .putter-step-btn:active { background: rgba(201,168,76,0.25); }
+  .putter-step-btn:disabled { color: rgba(201,168,76,0.2); cursor: default; }
+  .putter-count-wrap {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1px;
+    border-left: 1px solid rgba(201,168,76,0.15);
+    border-right: 1px solid rgba(201,168,76,0.15);
+  }
+  .putter-count {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px; color: var(--gold); line-height: 1;
+    transition: transform 0.1s;
+  }
+  .putter-count.bump { animation: bump 0.18s ease; }
+  @keyframes bump {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+  .putter-label {
+    font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: rgba(201,168,76,0.5);
+  }
+
+  /* ── BOTTOM BAR ── */
+  .bottom-bar {
+    padding: 10px 18px 20px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 8px; flex-shrink: 0;
+    background: rgba(15,26,13,0.5);
+    backdrop-filter: blur(8px);
+  }
+  .undo-btn {
+    background: rgba(176,48,32,0.1);
+    border: 1px solid rgba(176,48,32,0.28);
+    color: #e07060; border-radius: 12px;
+    padding: 13px 14px;
+    font-family: 'Karla', sans-serif;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer; flex-shrink: 0;
+    transition: all 0.12s;
+  }
+  .undo-btn:active { background: rgba(176,48,32,0.3); transform: scale(0.94); }
+  .sum-btn {
+    flex: 1;
+    background: rgba(201,168,76,0.1);
+    border: 1px solid var(--border-gold);
+    color: var(--gold); border-radius: 12px;
+    padding: 13px;
+    font-family: 'Karla', sans-serif;
+    font-size: 14px; font-weight: 700;
+    cursor: pointer; letter-spacing: 0.3px;
+    transition: all 0.12s;
+  }
+  .sum-btn:active { background: rgba(201,168,76,0.25); transform: scale(0.97); }
+
+  /* ── SUMMARY OVERLAY ── */
+  .overlay {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(8,13,7,0.97);
+    display: none; flex-direction: column;
+    padding: 22px 20px 24px;
+  }
+  .overlay.open { display: flex; }
+  .ov-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px; flex-shrink: 0;
+  }
+  .ov-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px; letter-spacing: 2.5px; color: var(--gold);
+  }
+  .ov-close {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.07); border: 1px solid var(--border);
+    color: var(--cream); font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ov-body { flex: 1; overflow-y: auto; scrollbar-width: none; }
+  .ov-body::-webkit-scrollbar { display: none; }
+
+  .sum-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .sum-left { text-align: right; min-width: 28px; flex-shrink: 0; }
+  .sum-hnum {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px; color: var(--gold); line-height: 1;
+  }
+  .sum-shots-count {
+    font-size: 9px; color: var(--cream-dim); letter-spacing: 0.5px;
+  }
+  .sum-pills { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; padding-top: 2px; }
+  .sum-pill {
+    background: rgba(45,82,40,0.55);
+    border: 1px solid rgba(77,143,65,0.3);
+    border-radius: 14px; padding: 2px 8px;
+    font-size: 12px; font-weight: 600; color: var(--cream);
+  }
+  .sum-none { font-size: 12px; color: rgba(255,255,255,0.25); font-style: italic; padding-top: 3px; }
+
+  .ov-stats {
+    flex-shrink: 0;
+    padding: 10px 0 0;
+    display: flex; gap: 10px;
+  }
+  .stat-box {
+    flex: 1; background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px;
+    text-align: center;
+  }
+  .stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px; color: var(--gold); line-height: 1;
+  }
+  .stat-lbl { font-size: 10px; color: var(--cream-dim); letter-spacing: 1px; margin-top: 2px; }
+
+  .copy-btn {
+    flex-shrink: 0; margin-top: 12px; width: 100%;
+    background: var(--green-mid); border: none; border-radius: 12px;
+    color: white; font-family: 'Karla', sans-serif;
+    font-size: 15px; font-weight: 700; padding: 15px;
+    cursor: pointer; letter-spacing: 0.3px;
+    transition: background 0.15s;
+  }
+  .copy-btn:active { background: var(--fairway); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo"><span class="logo-flag">⛳</span>ClubTrack</div>
+    <div class="hole-nav">
+      <button class="nav-btn" id="prev">‹</button>
+      <div class="hole-display">
+        <span class="hole-word">Hole</span>
+        <span class="hole-num" id="hNum">1</span>
+      </div>
+      <button class="nav-btn" id="next">›</button>
+    </div>
+  </div>
+
+  <!-- Hole strip -->
+  <div class="strip-wrap">
+    <div class="strip" id="strip"></div>
+  </div>
+
+  <!-- Shot log -->
+  <div class="shot-log">
+    <div class="log-label">Shots this hole</div>
+    <div class="shots-row" id="shotsRow"></div>
+  </div>
+
+  <!-- Club buttons -->
+  <div class="clubs-area">
+    <div class="group">
+      <div class="group-title">Woods &amp; Hybrid</div>
+      <div class="grid grid-4" id="gWoods"></div>
+    </div>
+    <div class="group">
+      <div class="group-title">Irons</div>
+      <div class="grid grid-5" id="gIrons"></div>
+    </div>
+    <div class="group">
+      <div class="group-title">Wedges</div>
+      <div class="grid grid-4" id="gWedges"></div>
+    </div>
+    <div class="group">
+      <div class="group-title">Putter</div>
+      <div class="putter-stepper">
+        <button class="putter-step-btn" id="putterMinus" disabled>−</button>
+        <div class="putter-count-wrap">
+          <div class="putter-count" id="putterCount">0</div>
+          <div class="putter-label">Putts</div>
+        </div>
+        <button class="putter-step-btn" id="putterPlus">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom bar -->
+  <div class="bottom-bar">
+    <button class="undo-btn" id="undoBtn">↩ Undo</button>
+    <button class="sum-btn" id="sumBtn">📋 Round Summary</button>
+  </div>
+</div>
+
+<!-- Summary overlay -->
+<div class="overlay" id="overlay">
+  <div class="ov-head">
+    <div class="ov-title">Round Summary</div>
+    <button class="ov-close" id="ovClose">×</button>
+  </div>
+  <div class="ov-body" id="ovBody"></div>
+  <div class="ov-stats" id="ovStats"></div>
+  <button class="copy-btn" id="copyBtn">Copy to Clipboard</button>
+</div>
+
+<script>
+const BAG = {
+  woods:  ['D', '5W', '5H'],
+  irons:  ['5i', '6i', '7i', '8i', '9i'],
+  wedges: ['PW', 'PA', 'AW', 'SW']
+};
+
+const HOLES = 18;
+let hole = 1;
+const round = Array.from({length: HOLES}, () => []);
+
+// ── STRIP ──
+const stripEl = document.getElementById('strip');
+for (let i = 1; i <= HOLES; i++) {
+  const c = document.createElement('div');
+  c.className = 'chip'; c.textContent = i; c.dataset.h = i;
+  c.addEventListener('click', () => { hole = i; render(); });
+  stripEl.appendChild(c);
+}
+
+// ── CLUB BUTTONS ──
+function buildGroup(id, clubs, isPutter = false) {
+  const g = document.getElementById(id);
+  clubs.forEach(name => {
+    const b = document.createElement('button');
+    b.className = 'cbt' + (isPutter ? ' putter-btn' : '');
+    b.textContent = name;
+    b.addEventListener('click', () => {
+      round[hole - 1].push(name);
+      b.classList.remove('flash');
+      void b.offsetWidth;
+      b.classList.add('flash');
+      render();
+    });
+    g.appendChild(b);
+  });
+}
+buildGroup('gWoods',  BAG.woods);
+buildGroup('gIrons',  BAG.irons);
+buildGroup('gWedges', BAG.wedges);
+
+// ── PUTTER STEPPER ──
+function getPutterCount() {
+  return round[hole-1].filter(c => c === 'Putter').length;
+}
+function setPutterCount(n) {
+  // Remove all existing putters from this hole's shots, then add n at the end
+  const nonPutts = round[hole-1].filter(c => c !== 'Putter');
+  round[hole-1] = [...nonPutts, ...Array(n).fill('Putter')];
+}
+function updatePutterUI(animate) {
+  const n = getPutterCount();
+  const countEl = document.getElementById('putterCount');
+  countEl.textContent = n;
+  if (animate) {
+    countEl.classList.remove('bump');
+    void countEl.offsetWidth;
+    countEl.classList.add('bump');
+  }
+  document.getElementById('putterMinus').disabled = n === 0;
+}
+document.getElementById('putterPlus').addEventListener('click', () => {
+  setPutterCount(getPutterCount() + 1);
+  updatePutterUI(true);
+  render();
+});
+document.getElementById('putterMinus').addEventListener('click', () => {
+  const n = getPutterCount();
+  if (n > 0) { setPutterCount(n - 1); updatePutterUI(true); render(); }
+});
+
+// ── RENDER ──
+function render() {
+  document.getElementById('hNum').textContent = hole;
+
+  document.querySelectorAll('.chip').forEach(c => {
+    const h = +c.dataset.h;
+    c.className = 'chip';
+    if (round[h-1].length) c.classList.add('logged');
+    if (h === hole)        c.classList.add('active');
+  });
+  document.querySelector('.chip.active')
+    ?.scrollIntoView({block:'nearest', inline:'center', behavior:'smooth'});
+
+  updatePutterUI(false);
+
+  const shots = round[hole - 1];
+  const row = document.getElementById('shotsRow');
+  if (!shots.length) {
+    row.innerHTML = '<span class="no-shots">Tap a club to start hole ' + hole + '</span>';
+  } else {
+    row.innerHTML = shots.map((c, i) =>
+      `<span class="shot-pill">
+        <span class="pill-num">#${i+1}</span>${c}
+        <button class="pill-x" data-i="${i}">✕</button>
+      </span>`
+    ).join('');
+    row.querySelectorAll('.pill-x').forEach(b =>
+      b.addEventListener('click', () => {
+        round[hole-1].splice(+b.dataset.i, 1);
+        render();
+      })
+    );
+  }
+}
+
+// ── NAV ──
+document.getElementById('prev').addEventListener('click', () => { if (hole > 1)    { hole--; render(); }});
+document.getElementById('next').addEventListener('click', () => { if (hole < HOLES) { hole++; render(); }});
+
+// ── UNDO ──
+document.getElementById('undoBtn').addEventListener('click', () => {
+  if (round[hole-1].length) { round[hole-1].pop(); render(); }
+});
+
+// ── SUMMARY ──
+document.getElementById('sumBtn').addEventListener('click', () => {
+  const body = document.getElementById('ovBody');
+  body.innerHTML = round.map((shots, i) => {
+    const pills = shots.length
+      ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
+      : '<span class="sum-none">No shots</span>';
+    return `<div class="sum-row">
+      <div class="sum-left">
+        <div class="sum-hnum">${i+1}</div>
+        <div class="sum-shots-count">${shots.length ? shots.length + 'sh' : ''}</div>
+      </div>
+      <div class="sum-pills">${pills}</div>
+    </div>`;
+  }).join('');
+
+  const total = round.reduce((a, s) => a + s.length, 0);
+  const holesPlayed = round.filter(s => s.length > 0).length;
+
+  // Club frequency — exclude Putter
+  const freq = {};
+  round.forEach(shots => shots.forEach(c => {
+    if (c !== 'Putter') freq[c] = (freq[c]||0)+1;
+  }));
+  const sorted = Object.entries(freq).sort((a,b)=>b[1]-a[1]);
+  let topLabel = '—';
+  if (sorted.length) {
+    const topCount = sorted[0][1];
+    const tied = sorted.filter(([,n]) => n === topCount).map(([c]) => c);
+    topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
+  }
+
+  document.getElementById('ovStats').innerHTML = `
+    <div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Total Shots</div></div>
+    <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
+    <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>
+  `;
+  document.getElementById('overlay').classList.add('open');
+});
+
+document.getElementById('ovClose').addEventListener('click', () =>
+  document.getElementById('overlay').classList.remove('open')
+);
+
+// ── COPY ──
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const text = round.map((shots, i) =>
+    `Hole ${i+1} (${shots.length} shots): ${shots.length ? shots.join(' → ') : '—'}`
+  ).join('\n');
+  navigator.clipboard.writeText(text).then(() => {
+    const b = document.getElementById('copyBtn');
+    b.textContent = '✓ Copied to clipboard!';
+    setTimeout(() => b.textContent = 'Copy to Clipboard', 2000);
+  });
+});
+
+render();
+</script>
+</body>
+</html>
