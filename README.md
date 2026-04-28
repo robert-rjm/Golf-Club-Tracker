@@ -5,7 +5,7 @@ A mobile-optimised single-page web app for tracking which clubs you hit on each 
 ## Features
 
 - Log clubs hit per shot, per hole across all 18 holes
-- Clubs: D, 5W, 5H, 5i–9i, PW, PA, AW, SW, Putter
+- Pre-round bag selection
 - Putter logged as a count (± stepper) rather than individual taps
 - Shot sequence visible per hole with ability to remove individual shots
 - Round summary showing all 18 holes with total shots and most-used club
@@ -21,7 +21,7 @@ Open `index.html` in a mobile browser. For the best experience on iPhone:
 
 ## Hosting
 
-Hosted via GitHub Pages at: `https://github.com/robert-rjm/Golf-Club-Tracker`
+Hosted via GitHub Pages at: [https://github.com/robert-rjm/Golf-Club-Tracker](https://robert-rjm.github.io/Golf-Club-Tracker/)
 
 ## Tech
 
