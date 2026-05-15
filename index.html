@@ -132,6 +132,11 @@
     display: inline-flex; align-items: center; gap: 4px;
     animation: pop 0.16s cubic-bezier(0.34,1.56,0.64,1);
   }
+  .shot-pill.penalty {
+    background: rgba(176,48,32,0.25);
+    border: 1px solid rgba(224,112,96,0.4);
+    color: #e07060;
+  }
   @keyframes pop {
     from { transform: scale(0.5); opacity: 0; }
     to   { transform: scale(1); opacity: 1; }
@@ -506,6 +511,25 @@ function buildClubButtons() {
   });
 }
 
+// Penalty button
+  const penaltyGroup = document.createElement('div');
+  penaltyGroup.className = 'group';
+  penaltyGroup.innerHTML = `<div class="group-title">Penalty</div>`;
+  const penaltyBtn = document.createElement('button');
+  penaltyBtn.className = 'cbt';
+  penaltyBtn.style.cssText = 'background: rgba(176,48,32,0.12); border-color: rgba(176,48,32,0.35); color: #e07060;';
+  penaltyBtn.textContent = '⚠ Penalty';
+  penaltyBtn.addEventListener('click', () => {
+    round[hole - 1].push('Penalty');
+    penaltyBtn.classList.remove('flash');
+    void penaltyBtn.offsetWidth;
+    penaltyBtn.classList.add('flash');
+    render();
+  });
+  penaltyGroup.appendChild(penaltyBtn);
+  area.appendChild(penaltyGroup);
+}
+  
 // ── PUTTER HELPERS ──
 function getPutterCount() {
   return round[hole-1].filter(c => c === 'Putter').length;
@@ -552,7 +576,7 @@ function render() {
     row.innerHTML = `<span class="no-shots">Tap a club to start hole ${hole}</span>`;
   } else {
     row.innerHTML = shots.map((c, i) =>
-      `<span class="shot-pill">
+      `<span class="shot-pill${c === 'Penalty' ? ' penalty' : ''}">
         <span class="pill-num">#${i+1}</span>${c}
         <button class="pill-x" data-i="${i}">✕</button>
       </span>`
