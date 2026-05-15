@@ -509,9 +509,8 @@ function buildClubButtons() {
     const n = getPutterCount();
     if (n > 0) { setPutterCount(n - 1); updatePutterUI(true); render(); }
   });
-}
 
-// Penalty button
+  // Penalty button
   const penaltyGroup = document.createElement('div');
   penaltyGroup.className = 'group';
   penaltyGroup.innerHTML = `<div class="group-title">Penalty</div>`;
