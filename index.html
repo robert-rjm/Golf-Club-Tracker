@@ -425,7 +425,23 @@ let activeBag = [...DEFAULT_BAG];
 
 const HOLES = 18;
 let hole = 1;
-const round = Array.from({length: HOLES}, () => []);
+let round = Array.from({length: HOLES}, () => []);
+
+// ── LOCALSTORAGE ──
+function saveState() {
+  localStorage.setItem('gct_round', JSON.stringify(round));
+  localStorage.setItem('gct_hole', hole);
+  localStorage.setItem('gct_bag', JSON.stringify(activeBag));
+}
+function loadState() {
+  const savedRound = localStorage.getItem('gct_round');
+  const savedHole  = localStorage.getItem('gct_hole');
+  const savedBag   = localStorage.getItem('gct_bag');
+  if (savedRound) round      = JSON.parse(savedRound);
+  if (savedHole)  hole       = parseInt(savedHole, 10);
+  if (savedBag)   activeBag  = JSON.parse(savedBag);
+}
+loadState();
 
 function roundStarted() {
   return round.some(h => h.length > 0);
@@ -477,6 +493,7 @@ function buildClubButtons() {
         b.classList.remove('flash');
         void b.offsetWidth;
         b.classList.add('flash');
+        saveState();
         render();
       });
       grid.appendChild(b);
@@ -503,11 +520,11 @@ function buildClubButtons() {
 
   document.getElementById('putterPlus').addEventListener('click', () => {
     setPutterCount(getPutterCount() + 1);
-    updatePutterUI(true); render();
+    updatePutterUI(true); saveState(); render();
   });
   document.getElementById('putterMinus').addEventListener('click', () => {
     const n = getPutterCount();
-    if (n > 0) { setPutterCount(n - 1); updatePutterUI(true); render(); }
+    if (n > 0) { setPutterCount(n - 1); updatePutterUI(true); saveState(); render(); }
   });
 
   // Penalty button
@@ -523,6 +540,7 @@ function buildClubButtons() {
     penaltyBtn.classList.remove('flash');
     void penaltyBtn.offsetWidth;
     penaltyBtn.classList.add('flash');
+    saveState();
     render();
   });
   penaltyGroup.appendChild(penaltyBtn);
@@ -583,6 +601,7 @@ function render() {
     row.querySelectorAll('.pill-x').forEach(b =>
       b.addEventListener('click', () => {
         round[hole-1].splice(+b.dataset.i, 1);
+        saveState();
         render();
       })
     );
@@ -590,12 +609,12 @@ function render() {
 }
 
 // ── NAV ──
-document.getElementById('prev').addEventListener('click', () => { if (hole > 1)    { hole--; render(); }});
-document.getElementById('next').addEventListener('click', () => { if (hole < HOLES) { hole++; render(); }});
+document.getElementById('prev').addEventListener('click', () => { if (hole > 1)    { hole--; saveState(); render(); }});
+document.getElementById('next').addEventListener('click', () => { if (hole < HOLES) { hole++; saveState(); render(); }});
 
 // ── UNDO ──
 document.getElementById('undoBtn').addEventListener('click', () => {
-  if (round[hole-1].length) { round[hole-1].pop(); render(); }
+  if (round[hole-1].length) { round[hole-1].pop(); saveState(); render(); }
 });
 
 // ── SUMMARY ──
@@ -698,6 +717,7 @@ function buildSettingsUI() {
 
 function closeSettings() {
   document.getElementById('settingsOverlay').classList.remove('open');
+  saveState();
   buildClubButtons();
   render();
 }
