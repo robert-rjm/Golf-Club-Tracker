@@ -81,6 +81,11 @@
     font-family: 'Bebas Neue', sans-serif;
     font-size: 28px; letter-spacing: 1px; color: var(--cream); line-height: 1;
   }
+  .hole-par {
+    font-size: 9px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--cream-dim);
+    display: block; text-align: center; min-height: 12px;
+  }
   .settings-btn {
     width: 36px; height: 36px; border-radius: 50%;
     background: rgba(255,255,255,0.05);
@@ -122,6 +127,11 @@
   .log-label {
     font-size: 9px; font-weight: 700; letter-spacing: 2px;
     text-transform: uppercase; color: var(--cream-dim);
+  }
+  #shotCount {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px; color: var(--gold); letter-spacing: 1px;
+    margin-left: 5px;
   }
   .shots-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
   .shot-pill {
@@ -286,6 +296,14 @@
     font-size: 12px; font-weight: 600; color: var(--cream);
   }
   .sum-none { font-size: 12px; color: rgba(255,255,255,0.25); font-style: italic; padding-top: 3px; }
+  .sum-sf {
+    flex-shrink: 0; min-width: 36px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  }
+  .sum-sf-pts {
+    font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--gold); line-height: 1;
+  }
+  .sum-sf-lbl { font-size: 8px; color: var(--cream-dim); letter-spacing: 0.5px; }
   .ov-stats { flex-shrink: 0; padding: 10px 0 0; display: flex; gap: 10px; }
   .stat-box {
     flex: 1; background: rgba(255,255,255,0.04);
@@ -466,6 +484,7 @@
       <div class="hole-display">
         <span class="hole-word">Hole</span>
         <span class="hole-num" id="hNum">1</span>
+        <span class="hole-par" id="holePar"></span>
       </div>
       <button class="nav-btn" id="next">›</button>
     </div>
@@ -477,7 +496,7 @@
   </div>
 
   <div class="shot-log">
-    <div class="log-label">Shots this hole</div>
+    <div class="log-label">Shots this hole <span id="shotCount"></span></div>
     <div class="shots-row" id="shotsRow"></div>
   </div>
 
@@ -511,14 +530,7 @@
     </div>
     <div class="lobby-section">
       <div class="lobby-label">Handicap (HCP)</div>
-      <div class="lobby-hcp-stepper">
-        <button class="lobby-hcp-btn" id="hcpMinus" disabled>−</button>
-        <div class="lobby-hcp-mid">
-          <div class="lobby-hcp-val" id="hcpVal">0</div>
-          <div class="lobby-hcp-lbl">HCP</div>
-        </div>
-        <button class="lobby-hcp-btn" id="hcpPlus">+</button>
-      </div>
+      <input type="number" class="lobby-custom-input" id="hcpInput" min="0" max="54" placeholder="33">
     </div>
   </div>
   <button class="lobby-start-btn" id="lobbyStartBtn" disabled>Select a course &amp; holes to start →</button>
@@ -554,6 +566,59 @@ const ALL_CLUBS = {
   'Wedges':         ['PW', 'PA', 'GW', 'AW', 'SW', 'LW']
 };
 
+// ── COURSE DATA ──
+const COURSES = {
+  'Golfclub St Genis': {
+    par: 74, sss: 70.2, slope: 131,
+    holes: [
+      { par: 4, si: 1  },
+      { par: 5, si: 11 },
+      { par: 4, si: 13 },
+      { par: 3, si: 17 },
+      { par: 4, si: 15 },
+      { par: 4, si: 5  },
+      { par: 5, si: 3  },
+      { par: 3, si: 7  },
+      { par: 5, si: 9  },
+      { par: 4, si: 2  },
+      { par: 5, si: 12 },
+      { par: 4, si: 14 },
+      { par: 3, si: 18 },
+      { par: 4, si: 16 },
+      { par: 4, si: 6  },
+      { par: 5, si: 4  },
+      { par: 3, si: 8  },
+      { par: 5, si: 10 },
+    ]
+  }
+};
+
+function getCourseData() {
+  return COURSES[selectedCourse] || null;
+}
+
+// WHS course handicap → adjusted for number of holes played
+function calcPlayingHCP(course, totalHoles) {
+  const ch = Math.round(hcp * (course.slope / 113) + (course.sss - course.par));
+  return Math.round(ch * totalHoles / 18);
+}
+
+// How many extra strokes a player receives on a given hole (0-based index)
+function strokesOnHole(holeIdx, playingHcp, course) {
+  const si   = course.holes[holeIdx].si;
+  const base = Math.floor(playingHcp / 18);
+  const rem  = playingHcp % 18;
+  return base + (si <= rem ? 1 : 0);
+}
+
+// Stableford points for a hole (returns null if hole not played)
+function stablefordPoints(holeIdx, grossShots, playingHcp, course) {
+  if (!grossShots) return null;
+  const par     = course.holes[holeIdx].par;
+  const strokes = strokesOnHole(holeIdx, playingHcp, course);
+  return Math.max(0, 2 + par + strokes - grossShots);
+}
+
 // My default bag — loaded on every fresh page open
 const DEFAULT_BAG = ['D', '5W', '5H', '5i', '6i', '7i', '8i', '9i', 'PW', 'PA', 'AW', 'SW'];
 
@@ -568,7 +633,7 @@ const PRESET_COURSES = ['Golfclub St Genis', 'Others'];
 const HOLE_OPTIONS   = [5, 9, 18];
 let selectedCourse   = '';
 let selectedHoles    = 0;   // 0 = not yet chosen
-let hcp              = 0;
+let hcp              = 33;
 
 // ── LOCALSTORAGE ──
 function saveState() {
@@ -591,7 +656,7 @@ function loadState() {
   if (savedBag)    activeBag      = JSON.parse(savedBag);
   if (savedHoles)  { HOLES = parseInt(savedHoles, 10); selectedHoles = HOLES; }
   if (savedCourse) selectedCourse = savedCourse;
-  if (savedHcp)    hcp            = parseInt(savedHcp, 10);
+  if (savedHcp !== null) hcp      = parseInt(savedHcp, 10);
 }
 loadState();
 
@@ -739,10 +804,25 @@ function render() {
 
   updatePutterUI(false);
 
+  // Par + stroke allowance label for current hole
+  const parEl = document.getElementById('holePar');
+  if (parEl) {
+    const cd = getCourseData();
+    if (cd && hole <= cd.holes.length) {
+      const ph = calcPlayingHCP(cd, HOLES);
+      const s  = strokesOnHole(hole - 1, ph, cd);
+      parEl.textContent = 'Par ' + cd.holes[hole-1].par + (s > 0 ? ' +' + s : '');
+    } else {
+      parEl.textContent = '';
+    }
+  }
+
   // Lock settings gear once round is started
   document.getElementById('settingsBtn').classList.toggle('locked', roundStarted());
 
   const shots = round[hole - 1];
+  const countEl = document.getElementById('shotCount');
+  if (countEl) countEl.textContent = shots.length > 0 ? shots.length : '';
   const row = document.getElementById('shotsRow');
   if (!shots.length) {
     row.innerHTML = `<span class="no-shots">Tap a club to start hole ${hole}</span>`;
@@ -774,17 +854,34 @@ document.getElementById('undoBtn').addEventListener('click', () => {
 
 // ── SUMMARY ──
 document.getElementById('sumBtn').addEventListener('click', () => {
+  const cd = getCourseData();
+  const ph = cd ? calcPlayingHCP(cd, HOLES) : 0;
+
   const body = document.getElementById('ovBody');
+  let totalSF = 0; let sfHoles = 0;
   body.innerHTML = round.map((shots, i) => {
     const pills = shots.length
       ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
       : '<span class="sum-none">No shots</span>';
+
+    let sfCol = '';
+    if (cd && i < cd.holes.length) {
+      const pts = stablefordPoints(i, shots.length, ph, cd);
+      if (pts !== null) { totalSF += pts; sfHoles++; }
+      const parLabel = 'Par ' + cd.holes[i].par;
+      sfCol = `<div class="sum-sf">
+        <div class="sum-sf-pts">${pts !== null ? pts : '—'}</div>
+        <div class="sum-sf-lbl">${parLabel}</div>
+      </div>`;
+    }
+
     return `<div class="sum-row">
       <div class="sum-left">
         <div class="sum-hnum">${i+1}</div>
         <div class="sum-shots-count">${shots.length ? shots.length + 'sh' : ''}</div>
       </div>
       <div class="sum-pills">${pills}</div>
+      ${sfCol}
     </div>`;
   }).join('');
 
@@ -803,16 +900,18 @@ document.getElementById('sumBtn').addEventListener('click', () => {
     topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
   }
 
-  const hcpAllowance = Math.round(hcp * HOLES / 18);
-  const netScore     = total - hcpAllowance;
+  const statsBoxes = cd
+    ? `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
+       <div class="stat-box"><div class="stat-val">${sfHoles > 0 ? totalSF : '—'}</div><div class="stat-lbl">Stableford</div></div>
+       <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
+       <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`
+    : `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
+       <div class="stat-box"><div class="stat-val">${hcp > 0 ? total - Math.round(hcp * HOLES / 18) : '—'}</div><div class="stat-lbl">Net Score</div></div>
+       <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
+       <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`;
 
-  document.getElementById('ovStats').innerHTML = `
-    <div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
-    <div class="stat-box"><div class="stat-val">${hcp > 0 ? netScore : '—'}</div><div class="stat-lbl">Net Score</div></div>
-    <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
-    <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>
-  `;
-  // Show course name in overlay title if set
+  document.getElementById('ovStats').innerHTML = statsBoxes;
+
   const titleEl = document.querySelector('#summaryOverlay .ov-title');
   if (titleEl) titleEl.textContent = selectedCourse || 'Round Summary';
   document.getElementById('summaryOverlay').classList.add('open');
@@ -847,6 +946,31 @@ document.getElementById('newRoundBtn').addEventListener('click', () => {
 });
 
 // ── LOBBY ──
+function holeOptionsFor(course) {
+  // 5-hole option only available at St Genis
+  return course === 'Golfclub St Genis' ? [5, 9, 18] : [9, 18];
+}
+
+function buildHoleOpts(course) {
+  const holesOpts = document.getElementById('holesOpts');
+  const options = holeOptionsFor(course);
+  // If current selectedHoles isn't valid for this course, reset it
+  if (!options.includes(selectedHoles)) selectedHoles = 0;
+  holesOpts.innerHTML = '';
+  options.forEach(n => {
+    const btn = document.createElement('button');
+    btn.className = 'lobby-opt' + (selectedHoles === n ? ' sel' : '');
+    btn.textContent = n + ' holes';
+    btn.addEventListener('click', () => {
+      selectedHoles = n;
+      holesOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      updateLobbyStartBtn();
+    });
+    holesOpts.appendChild(btn);
+  });
+}
+
 function openLobby() {
   // Rebuild course buttons
   const courseOpts = document.getElementById('courseOpts');
@@ -867,6 +991,7 @@ function openLobby() {
       } else {
         customInput.style.display = 'none';
       }
+      buildHoleOpts(selectedCourse);
       updateLobbyStartBtn();
     });
     courseOpts.appendChild(btn);
@@ -874,9 +999,7 @@ function openLobby() {
 
   const customInput = document.getElementById('customCourse');
   if (selectedCourse === 'Others' || !PRESET_COURSES.slice(0,-1).includes(selectedCourse)) {
-    // restore Others state if that was last selection
-    const othersBtn = courseOpts.querySelector('[data-course]') ||
-      [...courseOpts.querySelectorAll('.lobby-opt')].find(b => b.textContent === 'Others');
+    const othersBtn = [...courseOpts.querySelectorAll('.lobby-opt')].find(b => b.textContent === 'Others');
     if (othersBtn) othersBtn.classList.add('sel');
     customInput.style.display = 'block';
     customInput.value = PRESET_COURSES.includes(selectedCourse) ? '' : selectedCourse;
@@ -886,37 +1009,19 @@ function openLobby() {
   }
   customInput.addEventListener('input', () => {
     selectedCourse = customInput.value.trim() || 'Others';
+    buildHoleOpts(selectedCourse);
     updateLobbyStartBtn();
   });
 
-  // Rebuild hole buttons
-  const holesOpts = document.getElementById('holesOpts');
-  holesOpts.innerHTML = '';
-  HOLE_OPTIONS.forEach(n => {
-    const btn = document.createElement('button');
-    btn.className = 'lobby-opt' + (selectedHoles === n ? ' sel' : '');
-    btn.textContent = n + ' holes';
-    btn.addEventListener('click', () => {
-      selectedHoles = n;
-      holesOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
-      btn.classList.add('sel');
-      updateLobbyStartBtn();
-    });
-    holesOpts.appendChild(btn);
-  });
+  // Hole buttons — built based on current course
+  buildHoleOpts(selectedCourse);
 
-  // HCP stepper
-  document.getElementById('hcpVal').textContent = hcp;
-  document.getElementById('hcpMinus').disabled = hcp === 0;
-  document.getElementById('hcpPlus').onclick  = () => {
-    hcp = Math.min(54, hcp + 1);
-    document.getElementById('hcpVal').textContent = hcp;
-    document.getElementById('hcpMinus').disabled = false;
-  };
-  document.getElementById('hcpMinus').onclick = () => {
-    hcp = Math.max(0, hcp - 1);
-    document.getElementById('hcpVal').textContent = hcp;
-    document.getElementById('hcpMinus').disabled = hcp === 0;
+  // HCP input
+  const hcpInput = document.getElementById('hcpInput');
+  hcpInput.value = hcp;
+  hcpInput.oninput = () => {
+    const v = parseInt(hcpInput.value, 10);
+    hcp = isNaN(v) ? 33 : Math.min(54, Math.max(0, v));
   };
 
   updateLobbyStartBtn();
@@ -934,6 +1039,9 @@ function updateLobbyStartBtn() {
 
 document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   if (!selectedCourse || !selectedHoles) return;
+  const hcpInput = document.getElementById('hcpInput');
+  const v = parseInt(hcpInput.value, 10);
+  hcp = isNaN(v) ? 33 : Math.min(54, Math.max(0, v));
   HOLES = selectedHoles;
   round = Array.from({length: HOLES}, () => []);
   hole  = 1;
