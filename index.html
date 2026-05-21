@@ -306,7 +306,7 @@
     font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--gold); line-height: 1;
   }
   .sum-sf-lbl { font-size: 8px; color: var(--cream-dim); letter-spacing: 0.5px; }
-  .ov-stats { flex-shrink: 0; padding: 10px 0 0; display: flex; gap: 10px; }
+  .ov-stats { flex-shrink: 0; padding: 10px 0 0; display: flex; flex-wrap: wrap; gap: 10px; }
   .stat-box {
     flex: 1; background: rgba(255,255,255,0.04);
     border: 1px solid var(--border);
@@ -854,6 +854,16 @@ document.getElementById('undoBtn').addEventListener('click', () => {
   if (round[hole-1].length) { round[hole-1].pop(); saveState(); render(); }
 });
 
+// ── OVERLAY HELPERS (direct style — avoids Safari classList/flex bugs) ──
+function showOverlay(id) {
+  var el = document.getElementById(id);
+  el.style.display = 'flex';
+  el.style.flexDirection = 'column';
+}
+function hideOverlay(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
 // ── SUMMARY ──
 document.getElementById('sumBtn').addEventListener('click', () => {
   const cd = getCourseData();
@@ -898,7 +908,7 @@ document.getElementById('sumBtn').addEventListener('click', () => {
   let topLabel = '—';
   if (sorted.length) {
     const topCount = sorted[0][1];
-    const tied = sorted.filter(([,n]) => n === topCount).map(([c]) => c);
+    const tied = sorted.filter(function(e){ return e[1] === topCount; }).map(function(e){ return e[0]; });
     topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
   }
 
@@ -914,13 +924,13 @@ document.getElementById('sumBtn').addEventListener('click', () => {
 
   document.getElementById('ovStats').innerHTML = statsBoxes;
 
-  const titleEl = document.querySelector('#summaryOverlay .ov-title');
+  var titleEl = document.querySelector('#summaryOverlay .ov-title');
   if (titleEl) titleEl.textContent = selectedCourse || 'Round Summary';
-  document.getElementById('summaryOverlay').classList.add('open');
+  showOverlay('summaryOverlay');
 });
-document.getElementById('sumClose').addEventListener('click', () =>
-  document.getElementById('summaryOverlay').classList.remove('open')
-);
+document.getElementById('sumClose').addEventListener('click', function() {
+  hideOverlay('summaryOverlay');
+});
 
 // ── COPY ──
 document.getElementById('copyBtn').addEventListener('click', () => {
@@ -960,7 +970,7 @@ document.getElementById('newRoundBtn').addEventListener('click', () => {
   newRoundPending = false;
   btn.textContent = 'New Round';
   btn.style.borderColor = '';
-  document.getElementById('summaryOverlay').classList.remove('open');
+  hideOverlay('summaryOverlay');
   openLobby();
 });
 
@@ -1044,7 +1054,7 @@ function openLobby() {
   };
 
   updateLobbyStartBtn();
-  document.getElementById('lobbyOverlay').classList.add('open');
+  showOverlay('lobbyOverlay');
 }
 
 function updateLobbyStartBtn() {
@@ -1064,7 +1074,7 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   HOLES = selectedHoles;
   round = Array.from({length: HOLES}, () => []);
   hole  = 1;
-  document.getElementById('lobbyOverlay').classList.remove('open');
+  hideOverlay('lobbyOverlay');
   document.getElementById('settingsBtn').classList.remove('locked');
   saveState();
   buildStrip();
@@ -1117,7 +1127,7 @@ function buildSettingsUI() {
 }
 
 function closeSettings() {
-  document.getElementById('settingsOverlay').classList.remove('open');
+  hideOverlay('settingsOverlay');
   saveState();
   buildClubButtons();
   render();
@@ -1126,7 +1136,7 @@ function closeSettings() {
 document.getElementById('settingsBtn').addEventListener('click', () => {
   if (roundStarted()) return;
   buildSettingsUI();
-  document.getElementById('settingsOverlay').classList.add('open');
+  showOverlay('settingsOverlay');
 });
 document.getElementById('settingsClose').addEventListener('click', closeSettings);
 document.getElementById('startRoundBtn').addEventListener('click', closeSettings);
