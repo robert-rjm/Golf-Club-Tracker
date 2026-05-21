@@ -352,6 +352,100 @@
   }
   .settings-start-btn:active { background: var(--fairway); }
 
+  /* ── LOBBY ── */
+  .lobby-logo {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 32px 0 22px; flex-shrink: 0;
+  }
+  .lobby-logo-img {
+    max-width: 160px; max-height: 72px; object-fit: contain;
+    margin-bottom: 12px; display: none;
+  }
+  .lobby-logo-img[src]:not([src=""]) { display: block; }
+  .lobby-brand {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 38px; letter-spacing: 5px; color: var(--gold);
+  }
+  .lobby-tagline {
+    font-size: 10px; letter-spacing: 2.5px; color: var(--cream-dim);
+    text-transform: uppercase; margin-top: 5px;
+  }
+  .lobby-scroll {
+    flex: 1; overflow-y: auto; scrollbar-width: none;
+    display: flex; flex-direction: column; gap: 22px; padding: 4px 0;
+  }
+  .lobby-scroll::-webkit-scrollbar { display: none; }
+  .lobby-section { display: flex; flex-direction: column; gap: 10px; }
+  .lobby-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: rgba(201,168,76,0.55);
+  }
+  .lobby-opts { display: flex; gap: 8px; }
+  .lobby-opt {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 12px; color: rgba(255,255,255,0.35);
+    font-family: 'Karla', sans-serif;
+    font-size: 14px; font-weight: 700;
+    padding: 14px 8px; text-align: center;
+    cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  .lobby-opt.sel {
+    background: rgba(61,112,51,0.45);
+    border-color: rgba(77,143,65,0.6);
+    color: var(--cream);
+  }
+  .lobby-opt:active { transform: scale(0.92); }
+  .lobby-custom-input {
+    background: rgba(255,255,255,0.05);
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-radius: 12px; color: var(--cream);
+    font-family: 'Karla', sans-serif;
+    font-size: 15px; font-weight: 600;
+    padding: 13px 14px; width: 100%; outline: none;
+  }
+  .lobby-custom-input:focus { border-color: rgba(201,168,76,0.45); }
+  .lobby-custom-input::placeholder { color: rgba(255,255,255,0.25); }
+  .lobby-hcp-stepper {
+    display: flex; align-items: center;
+    background: rgba(201,168,76,0.08);
+    border: 1px solid rgba(201,168,76,0.22);
+    border-radius: 13px; overflow: hidden; height: 56px;
+  }
+  .lobby-hcp-btn {
+    flex: 0 0 64px; height: 100%;
+    background: none; border: none;
+    color: var(--gold); font-size: 28px; font-weight: 300;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.1s; user-select: none;
+  }
+  .lobby-hcp-btn:active { background: rgba(201,168,76,0.25); }
+  .lobby-hcp-btn:disabled { color: rgba(201,168,76,0.2); cursor: default; }
+  .lobby-hcp-mid {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    border-left: 1px solid rgba(201,168,76,0.15);
+    border-right: 1px solid rgba(201,168,76,0.15);
+  }
+  .lobby-hcp-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px; color: var(--gold); line-height: 1;
+  }
+  .lobby-hcp-lbl {
+    font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: rgba(201,168,76,0.5);
+  }
+  .lobby-start-btn {
+    flex-shrink: 0; margin-top: 14px; width: 100%;
+    background: var(--green-mid); border: none; border-radius: 14px;
+    color: white; font-family: 'Karla', sans-serif;
+    font-size: 17px; font-weight: 700; padding: 18px;
+    cursor: pointer; letter-spacing: 0.5px; transition: background 0.12s;
+  }
+  .lobby-start-btn:active { background: var(--fairway); }
+  .lobby-start-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
   /* ── FOOTNOTE ── */
   .footnote {
     text-align: center;
@@ -397,6 +491,39 @@
   </div>
 </div>
 
+<!-- Lobby overlay -->
+<div class="overlay" id="lobbyOverlay">
+  <div class="lobby-logo">
+    <!-- To add your own logo: set src="logo.png" (place the file alongside index.html) -->
+    <img class="lobby-logo-img" id="lobbyLogoImg" src="" alt="">
+    <div class="lobby-brand">⛳ ClubTrack</div>
+    <div class="lobby-tagline">Track every club. Every hole.</div>
+  </div>
+  <div class="lobby-scroll">
+    <div class="lobby-section">
+      <div class="lobby-label">Course</div>
+      <div class="lobby-opts" id="courseOpts"></div>
+      <input type="text" class="lobby-custom-input" id="customCourse" placeholder="Enter course name…" style="display:none">
+    </div>
+    <div class="lobby-section">
+      <div class="lobby-label">Holes</div>
+      <div class="lobby-opts" id="holesOpts"></div>
+    </div>
+    <div class="lobby-section">
+      <div class="lobby-label">Handicap (HCP)</div>
+      <div class="lobby-hcp-stepper">
+        <button class="lobby-hcp-btn" id="hcpMinus" disabled>−</button>
+        <div class="lobby-hcp-mid">
+          <div class="lobby-hcp-val" id="hcpVal">0</div>
+          <div class="lobby-hcp-lbl">HCP</div>
+        </div>
+        <button class="lobby-hcp-btn" id="hcpPlus">+</button>
+      </div>
+    </div>
+  </div>
+  <button class="lobby-start-btn" id="lobbyStartBtn" disabled>Select a course &amp; holes to start →</button>
+</div>
+
 <!-- Summary overlay -->
 <div class="overlay" id="summaryOverlay">
   <div class="ov-head">
@@ -432,23 +559,39 @@ const DEFAULT_BAG = ['D', '5W', '5H', '5i', '6i', '7i', '8i', '9i', 'PW', 'PA', 
 
 let activeBag = [...DEFAULT_BAG];
 
-const HOLES = 18;
-let hole = 1;
+let HOLES = 18;
+let hole  = 1;
 let round = Array.from({length: HOLES}, () => []);
+
+// ── LOBBY STATE ──
+const PRESET_COURSES = ['Golfclub St Genis', 'Others'];
+const HOLE_OPTIONS   = [5, 9, 18];
+let selectedCourse   = '';
+let selectedHoles    = 0;   // 0 = not yet chosen
+let hcp              = 0;
 
 // ── LOCALSTORAGE ──
 function saveState() {
-  localStorage.setItem('gct_round', JSON.stringify(round));
-  localStorage.setItem('gct_hole', hole);
-  localStorage.setItem('gct_bag', JSON.stringify(activeBag));
+  localStorage.setItem('gct_round',  JSON.stringify(round));
+  localStorage.setItem('gct_hole',   hole);
+  localStorage.setItem('gct_bag',    JSON.stringify(activeBag));
+  localStorage.setItem('gct_holes',  HOLES);
+  localStorage.setItem('gct_course', selectedCourse);
+  localStorage.setItem('gct_hcp',    hcp);
 }
 function loadState() {
-  const savedRound = localStorage.getItem('gct_round');
-  const savedHole  = localStorage.getItem('gct_hole');
-  const savedBag   = localStorage.getItem('gct_bag');
-  if (savedRound) round      = JSON.parse(savedRound);
-  if (savedHole)  hole       = parseInt(savedHole, 10);
-  if (savedBag)   activeBag  = JSON.parse(savedBag);
+  const savedRound  = localStorage.getItem('gct_round');
+  const savedHole   = localStorage.getItem('gct_hole');
+  const savedBag    = localStorage.getItem('gct_bag');
+  const savedHoles  = localStorage.getItem('gct_holes');
+  const savedCourse = localStorage.getItem('gct_course');
+  const savedHcp    = localStorage.getItem('gct_hcp');
+  if (savedRound)  round          = JSON.parse(savedRound);
+  if (savedHole)   hole           = parseInt(savedHole, 10);
+  if (savedBag)    activeBag      = JSON.parse(savedBag);
+  if (savedHoles)  { HOLES = parseInt(savedHoles, 10); selectedHoles = HOLES; }
+  if (savedCourse) selectedCourse = savedCourse;
+  if (savedHcp)    hcp            = parseInt(savedHcp, 10);
 }
 loadState();
 
@@ -457,12 +600,15 @@ function roundStarted() {
 }
 
 // ── STRIP ──
-const stripEl = document.getElementById('strip');
-for (let i = 1; i <= HOLES; i++) {
-  const c = document.createElement('div');
-  c.className = 'chip'; c.textContent = i; c.dataset.h = i;
-  c.addEventListener('click', () => { hole = i; render(); });
-  stripEl.appendChild(c);
+function buildStrip() {
+  const stripEl = document.getElementById('strip');
+  stripEl.innerHTML = '';
+  for (let i = 1; i <= HOLES; i++) {
+    const c = document.createElement('div');
+    c.className = 'chip'; c.textContent = i; c.dataset.h = i;
+    c.addEventListener('click', () => { hole = i; render(); });
+    stripEl.appendChild(c);
+  }
 }
 
 // ── BUILD CLUB BUTTONS ──
@@ -543,218 +689,4 @@ function buildClubButtons() {
   const penaltyBtn = document.createElement('button');
   penaltyBtn.className = 'cbt';
   penaltyBtn.style.cssText = 'background: rgba(176,48,32,0.12); border-color: rgba(176,48,32,0.35); color: #e07060;';
-  penaltyBtn.textContent = '⚠ Penalty';
-  penaltyBtn.addEventListener('click', () => {
-    round[hole - 1].push('Penalty');
-    penaltyBtn.classList.remove('flash');
-    void penaltyBtn.offsetWidth;
-    penaltyBtn.classList.add('flash');
-    saveState();
-    render();
-  });
-  penaltyGroup.appendChild(penaltyBtn);
-  area.appendChild(penaltyGroup);
-}
-  
-// ── PUTTER HELPERS ──
-function getPutterCount() {
-  return round[hole-1].filter(c => c === 'Putter').length;
-}
-function setPutterCount(n) {
-  const nonPutts = round[hole-1].filter(c => c !== 'Putter');
-  round[hole-1] = [...nonPutts, ...Array(n).fill('Putter')];
-}
-function updatePutterUI(animate) {
-  const countEl = document.getElementById('putterCount');
-  const minusBtn = document.getElementById('putterMinus');
-  if (!countEl) return;
-  const n = getPutterCount();
-  countEl.textContent = n;
-  if (animate) {
-    countEl.classList.remove('bump');
-    void countEl.offsetWidth;
-    countEl.classList.add('bump');
-  }
-  if (minusBtn) minusBtn.disabled = n === 0;
-}
-
-// ── RENDER ──
-function render() {
-  document.getElementById('hNum').textContent = hole;
-
-  document.querySelectorAll('.chip').forEach(c => {
-    const h = +c.dataset.h;
-    c.className = 'chip';
-    if (round[h-1].length) c.classList.add('logged');
-    if (h === hole)        c.classList.add('active');
-  });
-  document.querySelector('.chip.active')
-    ?.scrollIntoView({block:'nearest', inline:'center', behavior:'smooth'});
-
-  updatePutterUI(false);
-
-  // Lock settings gear once round is started
-  document.getElementById('settingsBtn').classList.toggle('locked', roundStarted());
-
-  const shots = round[hole - 1];
-  const row = document.getElementById('shotsRow');
-  if (!shots.length) {
-    row.innerHTML = `<span class="no-shots">Tap a club to start hole ${hole}</span>`;
-  } else {
-    row.innerHTML = shots.map((c, i) =>
-      `<span class="shot-pill${c === 'Penalty' ? ' penalty' : ''}">
-        <span class="pill-num">#${i+1}</span>${c}
-        <button class="pill-x" data-i="${i}">✕</button>
-      </span>`
-    ).join('');
-    row.querySelectorAll('.pill-x').forEach(b =>
-      b.addEventListener('click', () => {
-        round[hole-1].splice(+b.dataset.i, 1);
-        saveState();
-        render();
-      })
-    );
-  }
-}
-
-// ── NAV ──
-document.getElementById('prev').addEventListener('click', () => { if (hole > 1)    { hole--; saveState(); render(); }});
-document.getElementById('next').addEventListener('click', () => { if (hole < HOLES) { hole++; saveState(); render(); }});
-
-// ── UNDO ──
-document.getElementById('undoBtn').addEventListener('click', () => {
-  if (round[hole-1].length) { round[hole-1].pop(); saveState(); render(); }
-});
-
-// ── SUMMARY ──
-document.getElementById('sumBtn').addEventListener('click', () => {
-  const body = document.getElementById('ovBody');
-  body.innerHTML = round.map((shots, i) => {
-    const pills = shots.length
-      ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
-      : '<span class="sum-none">No shots</span>';
-    return `<div class="sum-row">
-      <div class="sum-left">
-        <div class="sum-hnum">${i+1}</div>
-        <div class="sum-shots-count">${shots.length ? shots.length + 'sh' : ''}</div>
-      </div>
-      <div class="sum-pills">${pills}</div>
-    </div>`;
-  }).join('');
-
-  const total = round.reduce((a, s) => a + s.length, 0);
-  const holesPlayed = round.filter(s => s.length > 0).length;
-
-  const freq = {};
-  round.forEach(shots => shots.forEach(c => {
-    if (c !== 'Putter') freq[c] = (freq[c]||0)+1;
-  }));
-  const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]);
-  let topLabel = '—';
-  if (sorted.length) {
-    const topCount = sorted[0][1];
-    const tied = sorted.filter(([,n]) => n === topCount).map(([c]) => c);
-    topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
-  }
-
-  document.getElementById('ovStats').innerHTML = `
-    <div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Total Shots</div></div>
-    <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
-    <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>
-  `;
-  document.getElementById('summaryOverlay').classList.add('open');
-});
-document.getElementById('sumClose').addEventListener('click', () =>
-  document.getElementById('summaryOverlay').classList.remove('open')
-);
-
-// ── COPY ──
-document.getElementById('copyBtn').addEventListener('click', () => {
-  const text = round.map((shots, i) =>
-    `Hole ${i+1} (${shots.length} shots): ${shots.length ? shots.join(' → ') : '—'}`
-  ).join('\n');
-  navigator.clipboard.writeText(text).then(() => {
-    const b = document.getElementById('copyBtn');
-    b.textContent = '✓ Copied to clipboard!';
-    setTimeout(() => b.textContent = 'Copy to Clipboard', 2000);
-  });
-});
-
-// ── NEW ROUND ──
-document.getElementById('newRoundBtn').addEventListener('click', () => {
-  if (!confirm('Start a new round? This will clear all shots.')) return;
-  round = Array.from({length: HOLES}, () => []);
-  hole = 1;
-  localStorage.removeItem('gct_round');
-  localStorage.removeItem('gct_hole');
-  document.getElementById('summaryOverlay').classList.remove('open');
-  document.getElementById('settingsBtn').classList.remove('locked');
-  buildClubButtons();
-  render();
-});
-
-// ── SETTINGS ──
-function buildSettingsUI() {
-  const scroll = document.getElementById('settingsScroll');
-  scroll.innerHTML = '';
-
-  Object.entries(ALL_CLUBS).forEach(([groupName, clubs]) => {
-    const group = document.createElement('div');
-    group.className = 'settings-group';
-
-    const title = document.createElement('div');
-    title.className = 'settings-group-title';
-    title.textContent = groupName;
-    group.appendChild(title);
-
-    const grid = document.createElement('div');
-    grid.className = 'settings-club-grid';
-
-    clubs.forEach(name => {
-      const btn = document.createElement('button');
-      btn.className = 'toggle-btn' + (activeBag.includes(name) ? ' on' : '');
-      btn.textContent = name;
-      btn.addEventListener('click', () => {
-        if (activeBag.includes(name)) {
-          activeBag = activeBag.filter(c => c !== name);
-          btn.classList.remove('on');
-        } else {
-          activeBag.push(name);
-          btn.classList.add('on');
-        }
-      });
-      grid.appendChild(btn);
-    });
-
-    group.appendChild(grid);
-    scroll.appendChild(group);
-  });
-
-  // Putter note
-  const note = document.createElement('div');
-  note.className = 'settings-putter-note';
-  note.innerHTML = `<span>⛳</span> Putter is always included`;
-  scroll.appendChild(note);
-}
-
-function closeSettings() {
-  document.getElementById('settingsOverlay').classList.remove('open');
-  saveState();
-  buildClubButtons();
-  render();
-}
-
-document.getElementById('settingsBtn').addEventListener('click', () => {
-  if (roundStarted()) return;
-  buildSettingsUI();
-  document.getElementById('settingsOverlay').classList.add('open');
-});
-document.getElementById('settingsClose').addEventListener('click', closeSettings);
-document.getElementById('startRoundBtn').addEventListener('click', closeSettings);
-
-// ── INIT ──
-buildClubButtons();
-render();
-</script>
-</body>
-</html>
+ 
