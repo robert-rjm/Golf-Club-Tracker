@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>ClubTrack</title>
+<link rel="apple-touch-icon" href="Logo.png">
+<link rel="icon" href="Logo.png">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Karla:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 
@@ -81,6 +83,11 @@
     font-family: 'Bebas Neue', sans-serif;
     font-size: 28px; letter-spacing: 1px; color: var(--cream); line-height: 1;
   }
+  .hole-par {
+    font-size: 9px; font-weight: 600; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--cream-dim);
+    display: block; text-align: center; min-height: 12px;
+  }
   .settings-btn {
     width: 36px; height: 36px; border-radius: 50%;
     background: rgba(255,255,255,0.05);
@@ -122,6 +129,11 @@
   .log-label {
     font-size: 9px; font-weight: 700; letter-spacing: 2px;
     text-transform: uppercase; color: var(--cream-dim);
+  }
+  #shotCount {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px; color: var(--gold); letter-spacing: 1px;
+    margin-left: 5px;
   }
   .shots-row { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
   .shot-pill {
@@ -286,6 +298,14 @@
     font-size: 12px; font-weight: 600; color: var(--cream);
   }
   .sum-none { font-size: 12px; color: rgba(255,255,255,0.25); font-style: italic; padding-top: 3px; }
+  .sum-sf {
+    flex-shrink: 0; min-width: 36px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  }
+  .sum-sf-pts {
+    font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--gold); line-height: 1;
+  }
+  .sum-sf-lbl { font-size: 8px; color: var(--cream-dim); letter-spacing: 0.5px; }
   .ov-stats { flex-shrink: 0; padding: 10px 0 0; display: flex; gap: 10px; }
   .stat-box {
     flex: 1; background: rgba(255,255,255,0.04);
@@ -352,6 +372,100 @@
   }
   .settings-start-btn:active { background: var(--fairway); }
 
+  /* ── LOBBY ── */
+  .lobby-logo {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 32px 0 22px; flex-shrink: 0;
+  }
+  .lobby-logo-img {
+    max-width: 160px; max-height: 72px; object-fit: contain;
+    margin-bottom: 12px; display: none;
+  }
+  .lobby-logo-img[src]:not([src=""]) { display: block; }
+  .lobby-brand {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 38px; letter-spacing: 5px; color: var(--gold);
+  }
+  .lobby-tagline {
+    font-size: 10px; letter-spacing: 2.5px; color: var(--cream-dim);
+    text-transform: uppercase; margin-top: 5px;
+  }
+  .lobby-scroll {
+    flex: 1; overflow-y: auto; scrollbar-width: none;
+    display: flex; flex-direction: column; gap: 22px; padding: 4px 0;
+  }
+  .lobby-scroll::-webkit-scrollbar { display: none; }
+  .lobby-section { display: flex; flex-direction: column; gap: 10px; }
+  .lobby-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: rgba(201,168,76,0.55);
+  }
+  .lobby-opts { display: flex; gap: 8px; }
+  .lobby-opt {
+    flex: 1;
+    background: rgba(255,255,255,0.04);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 12px; color: rgba(255,255,255,0.35);
+    font-family: 'Karla', sans-serif;
+    font-size: 14px; font-weight: 700;
+    padding: 14px 8px; text-align: center;
+    cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  .lobby-opt.sel {
+    background: rgba(61,112,51,0.45);
+    border-color: rgba(77,143,65,0.6);
+    color: var(--cream);
+  }
+  .lobby-opt:active { transform: scale(0.92); }
+  .lobby-custom-input {
+    background: rgba(255,255,255,0.05);
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-radius: 12px; color: var(--cream);
+    font-family: 'Karla', sans-serif;
+    font-size: 15px; font-weight: 600;
+    padding: 13px 14px; width: 100%; outline: none;
+  }
+  .lobby-custom-input:focus { border-color: rgba(201,168,76,0.45); }
+  .lobby-custom-input::placeholder { color: rgba(255,255,255,0.25); }
+  .lobby-hcp-stepper {
+    display: flex; align-items: center;
+    background: rgba(201,168,76,0.08);
+    border: 1px solid rgba(201,168,76,0.22);
+    border-radius: 13px; overflow: hidden; height: 56px;
+  }
+  .lobby-hcp-btn {
+    flex: 0 0 64px; height: 100%;
+    background: none; border: none;
+    color: var(--gold); font-size: 28px; font-weight: 300;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.1s; user-select: none;
+  }
+  .lobby-hcp-btn:active { background: rgba(201,168,76,0.25); }
+  .lobby-hcp-btn:disabled { color: rgba(201,168,76,0.2); cursor: default; }
+  .lobby-hcp-mid {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    border-left: 1px solid rgba(201,168,76,0.15);
+    border-right: 1px solid rgba(201,168,76,0.15);
+  }
+  .lobby-hcp-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px; color: var(--gold); line-height: 1;
+  }
+  .lobby-hcp-lbl {
+    font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: rgba(201,168,76,0.5);
+  }
+  .lobby-start-btn {
+    flex-shrink: 0; margin-top: 14px; width: 100%;
+    background: var(--green-mid); border: none; border-radius: 14px;
+    color: white; font-family: 'Karla', sans-serif;
+    font-size: 17px; font-weight: 700; padding: 18px;
+    cursor: pointer; letter-spacing: 0.5px; transition: background 0.12s;
+  }
+  .lobby-start-btn:active { background: var(--fairway); }
+  .lobby-start-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
   /* ── FOOTNOTE ── */
   .footnote {
     text-align: center;
@@ -372,6 +486,7 @@
       <div class="hole-display">
         <span class="hole-word">Hole</span>
         <span class="hole-num" id="hNum">1</span>
+        <span class="hole-par" id="holePar"></span>
       </div>
       <button class="nav-btn" id="next">›</button>
     </div>
@@ -383,7 +498,7 @@
   </div>
 
   <div class="shot-log">
-    <div class="log-label">Shots this hole</div>
+    <div class="log-label">Shots this hole <span id="shotCount"></span></div>
     <div class="shots-row" id="shotsRow"></div>
   </div>
 
@@ -395,6 +510,32 @@
     <button class="undo-btn" id="undoBtn">↩ Undo</button>
     <button class="sum-btn" id="sumBtn">📋 Round Summary</button>
   </div>
+</div>
+
+<!-- Lobby overlay -->
+<div class="overlay" id="lobbyOverlay">
+  <div class="lobby-logo">
+    <!-- To add your own logo: set src="Logo.png" (place the file alongside index.html) -->
+    <img class="lobby-logo-img" id="lobbyLogoImg" src="" alt="">
+    <div class="lobby-brand">⛳ ClubTrack</div>
+    <div class="lobby-tagline">Track every club. Every hole.</div>
+  </div>
+  <div class="lobby-scroll">
+    <div class="lobby-section">
+      <div class="lobby-label">Course</div>
+      <div class="lobby-opts" id="courseOpts"></div>
+      <input type="text" class="lobby-custom-input" id="customCourse" placeholder="Enter course name…" style="display:none">
+    </div>
+    <div class="lobby-section">
+      <div class="lobby-label">Holes</div>
+      <div class="lobby-opts" id="holesOpts"></div>
+    </div>
+    <div class="lobby-section">
+      <div class="lobby-label">Handicap (HCP)</div>
+      <input type="number" class="lobby-custom-input" id="hcpInput" min="0" max="54" placeholder="33">
+    </div>
+  </div>
+  <button class="lobby-start-btn" id="lobbyStartBtn" disabled>Select a course &amp; holes to start →</button>
 </div>
 
 <!-- Summary overlay -->
@@ -427,28 +568,97 @@ const ALL_CLUBS = {
   'Wedges':         ['PW', 'PA', 'GW', 'AW', 'SW', 'LW']
 };
 
+// ── COURSE DATA ──
+const COURSES = {
+  'Golfclub St Genis': {
+    par: 74, sss: 70.2, slope: 131,
+    holes: [
+      { par: 4, si: 1  },
+      { par: 5, si: 11 },
+      { par: 4, si: 13 },
+      { par: 3, si: 17 },
+      { par: 4, si: 15 },
+      { par: 4, si: 5  },
+      { par: 5, si: 3  },
+      { par: 3, si: 7  },
+      { par: 5, si: 9  },
+      { par: 4, si: 2  },
+      { par: 5, si: 12 },
+      { par: 4, si: 14 },
+      { par: 3, si: 18 },
+      { par: 4, si: 16 },
+      { par: 4, si: 6  },
+      { par: 5, si: 4  },
+      { par: 3, si: 8  },
+      { par: 5, si: 10 },
+    ]
+  }
+};
+
+function getCourseData() {
+  return COURSES[selectedCourse] || null;
+}
+
+// WHS course handicap → adjusted for number of holes played
+function calcPlayingHCP(course, totalHoles) {
+  const ch = Math.round(hcp * (course.slope / 113) + (course.sss - course.par));
+  return Math.round(ch * totalHoles / 18);
+}
+
+// How many extra strokes a player receives on a given hole (0-based index)
+function strokesOnHole(holeIdx, playingHcp, course) {
+  const si   = course.holes[holeIdx].si;
+  const base = Math.floor(playingHcp / 18);
+  const rem  = playingHcp % 18;
+  return base + (si <= rem ? 1 : 0);
+}
+
+// Stableford points for a hole (returns null if hole not played)
+function stablefordPoints(holeIdx, grossShots, playingHcp, course) {
+  if (!grossShots) return null;
+  const par     = course.holes[holeIdx].par;
+  const strokes = strokesOnHole(holeIdx, playingHcp, course);
+  return Math.max(0, 2 + par + strokes - grossShots);
+}
+
 // My default bag — loaded on every fresh page open
 const DEFAULT_BAG = ['D', '5W', '5H', '5i', '6i', '7i', '8i', '9i', 'PW', 'PA', 'AW', 'SW'];
 
 let activeBag = [...DEFAULT_BAG];
 
-const HOLES = 18;
-let hole = 1;
+let HOLES = 18;
+let hole  = 1;
 let round = Array.from({length: HOLES}, () => []);
+
+// ── LOBBY STATE ──
+const PRESET_COURSES = ['Golfclub St Genis', 'Others'];
+const HOLE_OPTIONS   = [5, 9, 18];
+let selectedCourse   = '';
+let selectedHoles    = 0;   // 0 = not yet chosen
+let hcp              = 33;
 
 // ── LOCALSTORAGE ──
 function saveState() {
-  localStorage.setItem('gct_round', JSON.stringify(round));
-  localStorage.setItem('gct_hole', hole);
-  localStorage.setItem('gct_bag', JSON.stringify(activeBag));
+  localStorage.setItem('gct_round',  JSON.stringify(round));
+  localStorage.setItem('gct_hole',   hole);
+  localStorage.setItem('gct_bag',    JSON.stringify(activeBag));
+  localStorage.setItem('gct_holes',  HOLES);
+  localStorage.setItem('gct_course', selectedCourse);
+  localStorage.setItem('gct_hcp',    hcp);
 }
 function loadState() {
-  const savedRound = localStorage.getItem('gct_round');
-  const savedHole  = localStorage.getItem('gct_hole');
-  const savedBag   = localStorage.getItem('gct_bag');
-  if (savedRound) round      = JSON.parse(savedRound);
-  if (savedHole)  hole       = parseInt(savedHole, 10);
-  if (savedBag)   activeBag  = JSON.parse(savedBag);
+  const savedRound  = localStorage.getItem('gct_round');
+  const savedHole   = localStorage.getItem('gct_hole');
+  const savedBag    = localStorage.getItem('gct_bag');
+  const savedHoles  = localStorage.getItem('gct_holes');
+  const savedCourse = localStorage.getItem('gct_course');
+  const savedHcp    = localStorage.getItem('gct_hcp');
+  if (savedRound)  round          = JSON.parse(savedRound);
+  if (savedHole)   hole           = parseInt(savedHole, 10);
+  if (savedBag)    activeBag      = JSON.parse(savedBag);
+  if (savedHoles)  { HOLES = parseInt(savedHoles, 10); selectedHoles = HOLES; }
+  if (savedCourse) selectedCourse = savedCourse;
+  if (savedHcp !== null) hcp      = parseInt(savedHcp, 10);
 }
 loadState();
 
@@ -457,12 +667,15 @@ function roundStarted() {
 }
 
 // ── STRIP ──
-const stripEl = document.getElementById('strip');
-for (let i = 1; i <= HOLES; i++) {
-  const c = document.createElement('div');
-  c.className = 'chip'; c.textContent = i; c.dataset.h = i;
-  c.addEventListener('click', () => { hole = i; render(); });
-  stripEl.appendChild(c);
+function buildStrip() {
+  const stripEl = document.getElementById('strip');
+  stripEl.innerHTML = '';
+  for (let i = 1; i <= HOLES; i++) {
+    const c = document.createElement('div');
+    c.className = 'chip'; c.textContent = i; c.dataset.h = i;
+    c.addEventListener('click', () => { hole = i; render(); });
+    stripEl.appendChild(c);
+  }
 }
 
 // ── BUILD CLUB BUTTONS ──
@@ -593,10 +806,25 @@ function render() {
 
   updatePutterUI(false);
 
+  // Par + stroke allowance label for current hole
+  const parEl = document.getElementById('holePar');
+  if (parEl) {
+    const cd = getCourseData();
+    if (cd && hole <= cd.holes.length) {
+      const ph = calcPlayingHCP(cd, HOLES);
+      const s  = strokesOnHole(hole - 1, ph, cd);
+      parEl.textContent = 'Par ' + cd.holes[hole-1].par + (s > 0 ? ' +' + s : '');
+    } else {
+      parEl.textContent = '';
+    }
+  }
+
   // Lock settings gear once round is started
   document.getElementById('settingsBtn').classList.toggle('locked', roundStarted());
 
   const shots = round[hole - 1];
+  const countEl = document.getElementById('shotCount');
+  if (countEl) countEl.textContent = shots.length > 0 ? shots.length : '';
   const row = document.getElementById('shotsRow');
   if (!shots.length) {
     row.innerHTML = `<span class="no-shots">Tap a club to start hole ${hole}</span>`;
@@ -628,17 +856,34 @@ document.getElementById('undoBtn').addEventListener('click', () => {
 
 // ── SUMMARY ──
 document.getElementById('sumBtn').addEventListener('click', () => {
+  const cd = getCourseData();
+  const ph = cd ? calcPlayingHCP(cd, HOLES) : 0;
+
   const body = document.getElementById('ovBody');
+  let totalSF = 0; let sfHoles = 0;
   body.innerHTML = round.map((shots, i) => {
     const pills = shots.length
       ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
       : '<span class="sum-none">No shots</span>';
+
+    let sfCol = '';
+    if (cd && i < cd.holes.length) {
+      const pts = stablefordPoints(i, shots.length, ph, cd);
+      if (pts !== null) { totalSF += pts; sfHoles++; }
+      const parLabel = 'Par ' + cd.holes[i].par;
+      sfCol = `<div class="sum-sf">
+        <div class="sum-sf-pts">${pts !== null ? pts : '—'}</div>
+        <div class="sum-sf-lbl">${parLabel}</div>
+      </div>`;
+    }
+
     return `<div class="sum-row">
       <div class="sum-left">
         <div class="sum-hnum">${i+1}</div>
         <div class="sum-shots-count">${shots.length ? shots.length + 'sh' : ''}</div>
       </div>
       <div class="sum-pills">${pills}</div>
+      ${sfCol}
     </div>`;
   }).join('');
 
@@ -657,11 +902,20 @@ document.getElementById('sumBtn').addEventListener('click', () => {
     topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
   }
 
-  document.getElementById('ovStats').innerHTML = `
-    <div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Total Shots</div></div>
-    <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
-    <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>
-  `;
+  const statsBoxes = cd
+    ? `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
+       <div class="stat-box"><div class="stat-val">${sfHoles > 0 ? totalSF : '—'}</div><div class="stat-lbl">Stableford</div></div>
+       <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
+       <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`
+    : `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
+       <div class="stat-box"><div class="stat-val">${hcp > 0 ? total - Math.round(hcp * HOLES / 18) : '—'}</div><div class="stat-lbl">Net Score</div></div>
+       <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
+       <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`;
+
+  document.getElementById('ovStats').innerHTML = statsBoxes;
+
+  const titleEl = document.querySelector('#summaryOverlay .ov-title');
+  if (titleEl) titleEl.textContent = selectedCourse || 'Round Summary';
   document.getElementById('summaryOverlay').classList.add('open');
 });
 document.getElementById('sumClose').addEventListener('click', () =>
@@ -670,9 +924,15 @@ document.getElementById('sumClose').addEventListener('click', () =>
 
 // ── COPY ──
 document.getElementById('copyBtn').addEventListener('click', () => {
-  const text = round.map((shots, i) =>
+  const header = [
+    selectedCourse ? `Course: ${selectedCourse}` : null,
+    `Holes: ${HOLES}`,
+    hcp > 0 ? `HCP: ${hcp}` : null,
+  ].filter(Boolean).join(' | ');
+  const rows = round.map((shots, i) =>
     `Hole ${i+1} (${shots.length} shots): ${shots.length ? shots.join(' → ') : '—'}`
   ).join('\n');
+  const text = header ? `${header}\n\n${rows}` : rows;
   navigator.clipboard.writeText(text).then(() => {
     const b = document.getElementById('copyBtn');
     b.textContent = '✓ Copied to clipboard!';
@@ -683,12 +943,114 @@ document.getElementById('copyBtn').addEventListener('click', () => {
 // ── NEW ROUND ──
 document.getElementById('newRoundBtn').addEventListener('click', () => {
   if (!confirm('Start a new round? This will clear all shots.')) return;
-  round = Array.from({length: HOLES}, () => []);
-  hole = 1;
-  localStorage.removeItem('gct_round');
-  localStorage.removeItem('gct_hole');
   document.getElementById('summaryOverlay').classList.remove('open');
+  openLobby();
+});
+
+// ── LOBBY ──
+function holeOptionsFor(course) {
+  // 5-hole option only available at St Genis
+  return course === 'Golfclub St Genis' ? [5, 9, 18] : [9, 18];
+}
+
+function buildHoleOpts(course) {
+  const holesOpts = document.getElementById('holesOpts');
+  const options = holeOptionsFor(course);
+  // If current selectedHoles isn't valid for this course, reset it
+  if (!options.includes(selectedHoles)) selectedHoles = 0;
+  holesOpts.innerHTML = '';
+  options.forEach(n => {
+    const btn = document.createElement('button');
+    btn.className = 'lobby-opt' + (selectedHoles === n ? ' sel' : '');
+    btn.textContent = n + ' holes';
+    btn.addEventListener('click', () => {
+      selectedHoles = n;
+      holesOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      updateLobbyStartBtn();
+    });
+    holesOpts.appendChild(btn);
+  });
+}
+
+function openLobby() {
+  // Rebuild course buttons
+  const courseOpts = document.getElementById('courseOpts');
+  courseOpts.innerHTML = '';
+  PRESET_COURSES.forEach(name => {
+    const btn = document.createElement('button');
+    btn.className = 'lobby-opt' + (selectedCourse === name ? ' sel' : '');
+    btn.textContent = name;
+    btn.addEventListener('click', () => {
+      selectedCourse = name;
+      courseOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      const customInput = document.getElementById('customCourse');
+      if (name === 'Others') {
+        customInput.style.display = 'block';
+        customInput.focus();
+        selectedCourse = customInput.value.trim() || 'Others';
+      } else {
+        customInput.style.display = 'none';
+      }
+      buildHoleOpts(selectedCourse);
+      updateLobbyStartBtn();
+    });
+    courseOpts.appendChild(btn);
+  });
+
+  const customInput = document.getElementById('customCourse');
+  if (selectedCourse === 'Others' || !PRESET_COURSES.slice(0,-1).includes(selectedCourse)) {
+    const othersBtn = [...courseOpts.querySelectorAll('.lobby-opt')].find(b => b.textContent === 'Others');
+    if (othersBtn) othersBtn.classList.add('sel');
+    customInput.style.display = 'block';
+    customInput.value = PRESET_COURSES.includes(selectedCourse) ? '' : selectedCourse;
+  } else {
+    customInput.style.display = 'none';
+    customInput.value = '';
+  }
+  customInput.addEventListener('input', () => {
+    selectedCourse = customInput.value.trim() || 'Others';
+    buildHoleOpts(selectedCourse);
+    updateLobbyStartBtn();
+  });
+
+  // Hole buttons — built based on current course
+  buildHoleOpts(selectedCourse);
+
+  // HCP input
+  const hcpInput = document.getElementById('hcpInput');
+  hcpInput.value = hcp;
+  hcpInput.oninput = () => {
+    const v = parseInt(hcpInput.value, 10);
+    hcp = isNaN(v) ? 33 : Math.min(54, Math.max(0, v));
+  };
+
+  updateLobbyStartBtn();
+  document.getElementById('lobbyOverlay').classList.add('open');
+}
+
+function updateLobbyStartBtn() {
+  const ready = selectedCourse.length > 0 && selectedHoles > 0;
+  const btn = document.getElementById('lobbyStartBtn');
+  btn.disabled = !ready;
+  btn.textContent = ready
+    ? `Tee off → ${selectedHoles} holes at ${selectedCourse}`
+    : 'Select a course & holes to start →';
+}
+
+document.getElementById('lobbyStartBtn').addEventListener('click', () => {
+  if (!selectedCourse || !selectedHoles) return;
+  const hcpInput = document.getElementById('hcpInput');
+  const v = parseInt(hcpInput.value, 10);
+  hcp = isNaN(v) ? 33 : Math.min(54, Math.max(0, v));
+  HOLES = selectedHoles;
+  round = Array.from({length: HOLES}, () => []);
+  hole  = 1;
+  document.getElementById('lobbyOverlay').classList.remove('open');
   document.getElementById('settingsBtn').classList.remove('locked');
+  saveState();
+  buildStrip();
   buildClubButtons();
   render();
 });
@@ -753,8 +1115,18 @@ document.getElementById('settingsClose').addEventListener('click', closeSettings
 document.getElementById('startRoundBtn').addEventListener('click', closeSettings);
 
 // ── INIT ──
-buildClubButtons();
-render();
+if (roundStarted()) {
+  // Resume saved round directly
+  buildStrip();
+  buildClubButtons();
+  render();
+} else {
+  // No active round — show lobby
+  buildStrip();
+  buildClubButtons();
+  render();
+  openLobby();
+}
 </script>
 </body>
 </html>
