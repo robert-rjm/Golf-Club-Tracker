@@ -689,4 +689,334 @@ function buildClubButtons() {
   const penaltyBtn = document.createElement('button');
   penaltyBtn.className = 'cbt';
   penaltyBtn.style.cssText = 'background: rgba(176,48,32,0.12); border-color: rgba(176,48,32,0.35); color: #e07060;';
- 
+  penaltyBtn.textContent = '⚠ Penalty';
+  penaltyBtn.addEventListener('click', () => {
+    round[hole - 1].push('Penalty');
+    penaltyBtn.classList.remove('flash');
+    void penaltyBtn.offsetWidth;
+    penaltyBtn.classList.add('flash');
+    saveState();
+    render();
+  });
+  penaltyGroup.appendChild(penaltyBtn);
+  area.appendChild(penaltyGroup);
+}
+  
+// ── PUTTER HELPERS ──
+function getPutterCount() {
+  return round[hole-1].filter(c => c === 'Putter').length;
+}
+function setPutterCount(n) {
+  const nonPutts = round[hole-1].filter(c => c !== 'Putter');
+  round[hole-1] = [...nonPutts, ...Array(n).fill('Putter')];
+}
+function updatePutterUI(animate) {
+  const countEl = document.getElementById('putterCount');
+  const minusBtn = document.getElementById('putterMinus');
+  if (!countEl) return;
+  const n = getPutterCount();
+  countEl.textContent = n;
+  if (animate) {
+    countEl.classList.remove('bump');
+    void countEl.offsetWidth;
+    countEl.classList.add('bump');
+  }
+  if (minusBtn) minusBtn.disabled = n === 0;
+}
+
+// ── RENDER ──
+function render() {
+  document.getElementById('hNum').textContent = hole;
+
+  document.querySelectorAll('.chip').forEach(c => {
+    const h = +c.dataset.h;
+    c.className = 'chip';
+    if (round[h-1].length) c.classList.add('logged');
+    if (h === hole)        c.classList.add('active');
+  });
+  document.querySelector('.chip.active')
+    ?.scrollIntoView({block:'nearest', inline:'center', behavior:'smooth'});
+
+  updatePutterUI(false);
+
+  // Lock settings gear once round is started
+  document.getElementById('settingsBtn').classList.toggle('locked', roundStarted());
+
+  const shots = round[hole - 1];
+  const row = document.getElementById('shotsRow');
+  if (!shots.length) {
+    row.innerHTML = `<span class="no-shots">Tap a club to start hole ${hole}</span>`;
+  } else {
+    row.innerHTML = shots.map((c, i) =>
+      `<span class="shot-pill${c === 'Penalty' ? ' penalty' : ''}">
+        <span class="pill-num">#${i+1}</span>${c}
+        <button class="pill-x" data-i="${i}">✕</button>
+      </span>`
+    ).join('');
+    row.querySelectorAll('.pill-x').forEach(b =>
+      b.addEventListener('click', () => {
+        round[hole-1].splice(+b.dataset.i, 1);
+        saveState();
+        render();
+      })
+    );
+  }
+}
+
+// ── NAV ──
+document.getElementById('prev').addEventListener('click', () => { if (hole > 1)    { hole--; saveState(); render(); }});
+document.getElementById('next').addEventListener('click', () => { if (hole < HOLES) { hole++; saveState(); render(); }});
+
+// ── UNDO ──
+document.getElementById('undoBtn').addEventListener('click', () => {
+  if (round[hole-1].length) { round[hole-1].pop(); saveState(); render(); }
+});
+
+// ── SUMMARY ──
+document.getElementById('sumBtn').addEventListener('click', () => {
+  const body = document.getElementById('ovBody');
+  body.innerHTML = round.map((shots, i) => {
+    const pills = shots.length
+      ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
+      : '<span class="sum-none">No shots</span>';
+    return `<div class="sum-row">
+      <div class="sum-left">
+        <div class="sum-hnum">${i+1}</div>
+        <div class="sum-shots-count">${shots.length ? shots.length + 'sh' : ''}</div>
+      </div>
+      <div class="sum-pills">${pills}</div>
+    </div>`;
+  }).join('');
+
+  const total = round.reduce((a, s) => a + s.length, 0);
+  const holesPlayed = round.filter(s => s.length > 0).length;
+
+  const freq = {};
+  round.forEach(shots => shots.forEach(c => {
+    if (c !== 'Putter') freq[c] = (freq[c]||0)+1;
+  }));
+  const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]);
+  let topLabel = '—';
+  if (sorted.length) {
+    const topCount = sorted[0][1];
+    const tied = sorted.filter(([,n]) => n === topCount).map(([c]) => c);
+    topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
+  }
+
+  const hcpAllowance = Math.round(hcp * HOLES / 18);
+  const netScore     = total - hcpAllowance;
+
+  document.getElementById('ovStats').innerHTML = `
+    <div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
+    <div class="stat-box"><div class="stat-val">${hcp > 0 ? netScore : '—'}</div><div class="stat-lbl">Net Score</div></div>
+    <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
+    <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>
+  `;
+  // Show course name in overlay title if set
+  const titleEl = document.querySelector('#summaryOverlay .ov-title');
+  if (titleEl) titleEl.textContent = selectedCourse || 'Round Summary';
+  document.getElementById('summaryOverlay').classList.add('open');
+});
+document.getElementById('sumClose').addEventListener('click', () =>
+  document.getElementById('summaryOverlay').classList.remove('open')
+);
+
+// ── COPY ──
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const header = [
+    selectedCourse ? `Course: ${selectedCourse}` : null,
+    `Holes: ${HOLES}`,
+    hcp > 0 ? `HCP: ${hcp}` : null,
+  ].filter(Boolean).join(' | ');
+  const rows = round.map((shots, i) =>
+    `Hole ${i+1} (${shots.length} shots): ${shots.length ? shots.join(' → ') : '—'}`
+  ).join('\n');
+  const text = header ? `${header}\n\n${rows}` : rows;
+  navigator.clipboard.writeText(text).then(() => {
+    const b = document.getElementById('copyBtn');
+    b.textContent = '✓ Copied to clipboard!';
+    setTimeout(() => b.textContent = 'Copy to Clipboard', 2000);
+  });
+});
+
+// ── NEW ROUND ──
+document.getElementById('newRoundBtn').addEventListener('click', () => {
+  if (!confirm('Start a new round? This will clear all shots.')) return;
+  document.getElementById('summaryOverlay').classList.remove('open');
+  openLobby();
+});
+
+// ── LOBBY ──
+function openLobby() {
+  // Rebuild course buttons
+  const courseOpts = document.getElementById('courseOpts');
+  courseOpts.innerHTML = '';
+  PRESET_COURSES.forEach(name => {
+    const btn = document.createElement('button');
+    btn.className = 'lobby-opt' + (selectedCourse === name ? ' sel' : '');
+    btn.textContent = name;
+    btn.addEventListener('click', () => {
+      selectedCourse = name;
+      courseOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      const customInput = document.getElementById('customCourse');
+      if (name === 'Others') {
+        customInput.style.display = 'block';
+        customInput.focus();
+        selectedCourse = customInput.value.trim() || 'Others';
+      } else {
+        customInput.style.display = 'none';
+      }
+      updateLobbyStartBtn();
+    });
+    courseOpts.appendChild(btn);
+  });
+
+  const customInput = document.getElementById('customCourse');
+  if (selectedCourse === 'Others' || !PRESET_COURSES.slice(0,-1).includes(selectedCourse)) {
+    // restore Others state if that was last selection
+    const othersBtn = courseOpts.querySelector('[data-course]') ||
+      [...courseOpts.querySelectorAll('.lobby-opt')].find(b => b.textContent === 'Others');
+    if (othersBtn) othersBtn.classList.add('sel');
+    customInput.style.display = 'block';
+    customInput.value = PRESET_COURSES.includes(selectedCourse) ? '' : selectedCourse;
+  } else {
+    customInput.style.display = 'none';
+    customInput.value = '';
+  }
+  customInput.addEventListener('input', () => {
+    selectedCourse = customInput.value.trim() || 'Others';
+    updateLobbyStartBtn();
+  });
+
+  // Rebuild hole buttons
+  const holesOpts = document.getElementById('holesOpts');
+  holesOpts.innerHTML = '';
+  HOLE_OPTIONS.forEach(n => {
+    const btn = document.createElement('button');
+    btn.className = 'lobby-opt' + (selectedHoles === n ? ' sel' : '');
+    btn.textContent = n + ' holes';
+    btn.addEventListener('click', () => {
+      selectedHoles = n;
+      holesOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      updateLobbyStartBtn();
+    });
+    holesOpts.appendChild(btn);
+  });
+
+  // HCP stepper
+  document.getElementById('hcpVal').textContent = hcp;
+  document.getElementById('hcpMinus').disabled = hcp === 0;
+  document.getElementById('hcpPlus').onclick  = () => {
+    hcp = Math.min(54, hcp + 1);
+    document.getElementById('hcpVal').textContent = hcp;
+    document.getElementById('hcpMinus').disabled = false;
+  };
+  document.getElementById('hcpMinus').onclick = () => {
+    hcp = Math.max(0, hcp - 1);
+    document.getElementById('hcpVal').textContent = hcp;
+    document.getElementById('hcpMinus').disabled = hcp === 0;
+  };
+
+  updateLobbyStartBtn();
+  document.getElementById('lobbyOverlay').classList.add('open');
+}
+
+function updateLobbyStartBtn() {
+  const ready = selectedCourse.length > 0 && selectedHoles > 0;
+  const btn = document.getElementById('lobbyStartBtn');
+  btn.disabled = !ready;
+  btn.textContent = ready
+    ? `Tee off → ${selectedHoles} holes at ${selectedCourse}`
+    : 'Select a course & holes to start →';
+}
+
+document.getElementById('lobbyStartBtn').addEventListener('click', () => {
+  if (!selectedCourse || !selectedHoles) return;
+  HOLES = selectedHoles;
+  round = Array.from({length: HOLES}, () => []);
+  hole  = 1;
+  document.getElementById('lobbyOverlay').classList.remove('open');
+  document.getElementById('settingsBtn').classList.remove('locked');
+  saveState();
+  buildStrip();
+  buildClubButtons();
+  render();
+});
+
+// ── SETTINGS ──
+function buildSettingsUI() {
+  const scroll = document.getElementById('settingsScroll');
+  scroll.innerHTML = '';
+
+  Object.entries(ALL_CLUBS).forEach(([groupName, clubs]) => {
+    const group = document.createElement('div');
+    group.className = 'settings-group';
+
+    const title = document.createElement('div');
+    title.className = 'settings-group-title';
+    title.textContent = groupName;
+    group.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'settings-club-grid';
+
+    clubs.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'toggle-btn' + (activeBag.includes(name) ? ' on' : '');
+      btn.textContent = name;
+      btn.addEventListener('click', () => {
+        if (activeBag.includes(name)) {
+          activeBag = activeBag.filter(c => c !== name);
+          btn.classList.remove('on');
+        } else {
+          activeBag.push(name);
+          btn.classList.add('on');
+        }
+      });
+      grid.appendChild(btn);
+    });
+
+    group.appendChild(grid);
+    scroll.appendChild(group);
+  });
+
+  // Putter note
+  const note = document.createElement('div');
+  note.className = 'settings-putter-note';
+  note.innerHTML = `<span>⛳</span> Putter is always included`;
+  scroll.appendChild(note);
+}
+
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('open');
+  saveState();
+  buildClubButtons();
+  render();
+}
+
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  if (roundStarted()) return;
+  buildSettingsUI();
+  document.getElementById('settingsOverlay').classList.add('open');
+});
+document.getElementById('settingsClose').addEventListener('click', closeSettings);
+document.getElementById('startRoundBtn').addEventListener('click', closeSettings);
+
+// ── INIT ──
+if (roundStarted()) {
+  // Resume saved round directly
+  buildStrip();
+  buildClubButtons();
+  render();
+} else {
+  // No active round — show lobby
+  buildStrip();
+  buildClubButtons();
+  render();
+  openLobby();
+}
+</script>
+</body>
+</html>
