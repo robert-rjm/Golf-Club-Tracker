@@ -259,12 +259,12 @@
 
   /* ── OVERLAYS (shared) ── */
   .overlay {
-    position: fixed; inset: 0; z-index: 100;
+    position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 100;
     background: rgba(8,13,7,0.97);
-    display: none; flex-direction: column;
+    display: none;
     padding: 22px 20px calc(24px + env(safe-area-inset-bottom));
   }
-  .overlay.open { display: flex; }
+  .overlay.open { display: flex; flex-direction: column; }
   .ov-head {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 16px; flex-shrink: 0;
@@ -941,8 +941,25 @@ document.getElementById('copyBtn').addEventListener('click', () => {
 });
 
 // ── NEW ROUND ──
+let newRoundPending = false;
 document.getElementById('newRoundBtn').addEventListener('click', () => {
-  if (!confirm('Start a new round? This will clear all shots.')) return;
+  const btn = document.getElementById('newRoundBtn');
+  if (!newRoundPending) {
+    newRoundPending = true;
+    btn.textContent = 'Tap again to confirm';
+    btn.style.borderColor = 'rgba(176,48,32,0.7)';
+    setTimeout(() => {
+      if (newRoundPending) {
+        newRoundPending = false;
+        btn.textContent = 'New Round';
+        btn.style.borderColor = '';
+      }
+    }, 3000);
+    return;
+  }
+  newRoundPending = false;
+  btn.textContent = 'New Round';
+  btn.style.borderColor = '';
   document.getElementById('summaryOverlay').classList.remove('open');
   openLobby();
 });
