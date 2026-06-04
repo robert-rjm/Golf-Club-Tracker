@@ -529,6 +529,7 @@
     <div class="lobby-section">
       <div class="lobby-label">Holes</div>
       <div class="lobby-opts" id="holesOpts"></div>
+      <div class="lobby-opts" id="nineOpts" style="display:none;margin-top:6px"></div>
     </div>
     <div class="lobby-section">
       <div class="lobby-label">Handicap (HCP)</div>
@@ -570,10 +571,22 @@ const ALL_CLUBS = {
 };
 
 function getCourseData() {
-  // Find the COURSES entry matching selected course name and hole count
-  return Object.values(COURSES).find(c =>
+  // Check for an explicit entry first
+  const explicit = Object.values(COURSES).find(c =>
     courseBaseName(c) === selectedCourse && c.holes.length === selectedHoles
-  ) || null;
+  );
+  if (explicit) return explicit;
+  // For 9 holes derived from an 18-hole entry (front or back nine)
+  if (selectedHoles === 9 && selectedNine) {
+    const full = Object.values(COURSES).find(c =>
+      courseBaseName(c) === selectedCourse && c.holes.length === 18
+    );
+    if (full) {
+      const holes = selectedNine === 'front' ? full.holes.slice(0, 9) : full.holes.slice(9, 18);
+      return { ...full, holes, par: holes.reduce((s, h) => s + h.par, 0) };
+    }
+  }
+  return null;
 }
 
 // Returns the base course name (strips ' - X Hole' suffix if present)
@@ -617,6 +630,7 @@ let round = Array.from({length: HOLES}, () => []);
 const HOLE_OPTIONS   = [5, 9, 18];
 let selectedCourse   = '';
 let selectedHoles    = 0;   // 0 = not yet chosen
+let selectedNine     = null; // 'front' | 'back' | null — only used when 9 holes derived from 18
 let hcp              = 33;
 
 // ── LOCALSTORAGE ──
@@ -958,18 +972,48 @@ document.getElementById('newRoundBtn').addEventListener('click', () => {
 
 // ── LOBBY ──
 function holeOptionsFor(course) {
-  // Derive available hole counts from COURSES entries matching this course name
   const counts = Object.keys(COURSES)
     .filter(k => k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course)
     .map(k => COURSES[k].holes.length);
-  return [...new Set(counts)].sort((a, b) => a - b);
+  const set = new Set(counts);
+  // Any course with an 18-hole entry also offers 9 (front or back)
+  if (set.has(18)) set.add(9);
+  return [...set].sort((a, b) => a - b);
+}
+
+// Returns true if 9 holes for this course is derived from 18 (no explicit 9-hole entry)
+function nineIsDerived(course) {
+  const hasExplicit9 = Object.keys(COURSES).some(k =>
+    k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course && COURSES[k].holes.length === 9
+  );
+  return !hasExplicit9;
+}
+
+function buildNineOpts() {
+  const nineOpts = document.getElementById('nineOpts');
+  nineOpts.innerHTML = '';
+  ['front', 'back'].forEach(side => {
+    const btn = document.createElement('button');
+    btn.className = 'lobby-opt' + (selectedNine === side ? ' sel' : '');
+    btn.textContent = side.charAt(0).toUpperCase() + side.slice(1) + ' 9';
+    btn.addEventListener('click', () => {
+      selectedNine = side;
+      nineOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      updateLobbyStartBtn();
+    });
+    nineOpts.appendChild(btn);
+  });
+  nineOpts.style.display = '';
 }
 
 function buildHoleOpts(course) {
   const holesOpts = document.getElementById('holesOpts');
+  const nineOpts  = document.getElementById('nineOpts');
   const options = holeOptionsFor(course);
   // If current selectedHoles isn't valid for this course, reset it
-  if (!options.includes(selectedHoles)) selectedHoles = 0;
+  if (!options.includes(selectedHoles)) { selectedHoles = 0; selectedNine = null; }
+  nineOpts.style.display = 'none';
   holesOpts.innerHTML = '';
   options.forEach(n => {
     const btn = document.createElement('button');
@@ -977,12 +1021,22 @@ function buildHoleOpts(course) {
     btn.textContent = n + ' holes';
     btn.addEventListener('click', () => {
       selectedHoles = n;
+      selectedNine = null;
       holesOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
       btn.classList.add('sel');
+      // Show front/back prompt if 9 holes is derived from 18
+      if (n === 9 && nineIsDerived(selectedCourse)) {
+        buildNineOpts();
+      } else {
+        nineOpts.style.display = 'none';
+        nineOpts.innerHTML = '';
+      }
       updateLobbyStartBtn();
     });
     holesOpts.appendChild(btn);
   });
+  // Re-show front/back row if 9 is already selected and derived
+  if (selectedHoles === 9 && nineIsDerived(course)) buildNineOpts();
 }
 
 function openLobby() {
@@ -1043,12 +1097,16 @@ function openLobby() {
 }
 
 function updateLobbyStartBtn() {
-  const ready = selectedCourse.length > 0 && selectedHoles > 0;
+  const needsNine = selectedHoles === 9 && nineIsDerived(selectedCourse);
+  const ready = selectedCourse.length > 0 && selectedHoles > 0 && (!needsNine || selectedNine);
   const btn = document.getElementById('lobbyStartBtn');
   btn.disabled = !ready;
+  const nineLabel = selectedNine ? ` (${selectedNine} 9)` : '';
   btn.textContent = ready
-    ? `Tee off → ${selectedHoles} holes at ${selectedCourse}`
-    : 'Select a course & holes to start →';
+    ? `Tee off → ${selectedHoles} holes at ${selectedCourse}${nineLabel}`
+    : needsNine && !selectedNine
+      ? 'Select front or back 9 →'
+      : 'Select a course & holes to start →';
 }
 
 document.getElementById('lobbyStartBtn').addEventListener('click', () => {
