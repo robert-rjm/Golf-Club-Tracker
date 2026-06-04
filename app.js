@@ -11,12 +11,19 @@ function withSecondRound(courseObj) {
   return { ...courseObj, holes, par: holes.reduce((s, h) => s + h.par, 0) };
 }
 
+// Rotate an 18-hole course to start on back 9 when selectedStart === 'back'
+function withStartNine(courseObj) {
+  if (selectedStart !== 'back' || courseObj.holes.length !== 18) return courseObj;
+  const holes = [...courseObj.holes.slice(9), ...courseObj.holes.slice(0, 9)];
+  return { ...courseObj, holes };
+}
+
 function getCourseData() {
   // Check for an explicit entry first
   const explicit = Object.values(COURSES).find(c =>
     courseBaseName(c) === selectedCourse && c.holes.length === selectedHoles
   );
-  if (explicit) return withSecondRound(explicit);
+  if (explicit) return withSecondRound(withStartNine(explicit));
   // For 9 holes derived from an 18-hole entry (front or back nine)
   if (selectedHoles === 9 && selectedNine) {
     const full = Object.values(COURSES).find(c =>
@@ -88,6 +95,7 @@ const HOLE_OPTIONS   = [5, 9, 18];
 let selectedCourse   = '';
 let selectedHoles    = 0;   // 0 = not yet chosen
 let selectedNine     = null; // 'front' | 'back' | null — only used when 9 holes derived from 18
+let selectedStart    = null; // 'front' | 'back' | null — which 9 to start on for a full 18
 let secondRound      = false; // play the selected holes twice (e.g. 9 → 18)
 let customHolePars   = [];   // per-hole par for custom/Others courses (null = not set)
 let hcp = localStorage.getItem('gct_hcp') !== null
@@ -500,6 +508,31 @@ function nineIsDerived(course) {
   return !hasExplicit9;
 }
 
+// Returns true when the course has an 18-hole entry (so front/back start matters)
+function hasFullRound(course) {
+  return Object.keys(COURSES).some(k =>
+    k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course && COURSES[k].holes.length === 18
+  );
+}
+
+function buildStartOpts() {
+  const startOpts = document.getElementById('startOpts');
+  startOpts.innerHTML = '';
+  [{ label: 'Start hole 1 (front)', val: 'front' }, { label: 'Start hole 10 (back)', val: 'back' }].forEach(({ label, val }) => {
+    const btn = document.createElement('button');
+    btn.className = 'lobby-opt' + (selectedStart === val ? ' sel' : '');
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      selectedStart = val;
+      startOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      updateLobbyStartBtn();
+    });
+    startOpts.appendChild(btn);
+  });
+  startOpts.style.display = '';
+}
+
 function buildNineOpts() {
   const nineOpts = document.getElementById('nineOpts');
   nineOpts.innerHTML = '';
@@ -549,11 +582,13 @@ function isCustomCourse(course) {
 function buildHoleOpts(course) {
   const holesOpts = document.getElementById('holesOpts');
   const nineOpts  = document.getElementById('nineOpts');
+  const startOpts = document.getElementById('startOpts');
   const parGrid   = document.getElementById('parGrid');
   const options = holeOptionsFor(course);
   // If current selectedHoles isn't valid for this course, reset it
-  if (!options.includes(selectedHoles)) { selectedHoles = 0; selectedNine = null; }
+  if (!options.includes(selectedHoles)) { selectedHoles = 0; selectedNine = null; selectedStart = null; }
   nineOpts.style.display = 'none';
+  startOpts.style.display = 'none';
   parGrid.style.display = 'none';
   holesOpts.innerHTML = '';
   options.forEach(n => {
@@ -563,6 +598,7 @@ function buildHoleOpts(course) {
     btn.addEventListener('click', () => {
       selectedHoles = n;
       selectedNine = null;
+      selectedStart = null;
       holesOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
       btn.classList.add('sel');
       // Show front/back prompt if 9 holes is derived from 18
@@ -571,6 +607,13 @@ function buildHoleOpts(course) {
       } else {
         nineOpts.style.display = 'none';
         nineOpts.innerHTML = '';
+      }
+      // Show start hole prompt for full 18 on a known course
+      if (n === 18 && hasFullRound(selectedCourse)) {
+        buildStartOpts();
+      } else {
+        startOpts.style.display = 'none';
+        startOpts.innerHTML = '';
       }
       // Show per-hole par grid for custom/Others courses
       if (isCustomCourse(selectedCourse)) {
@@ -586,6 +629,7 @@ function buildHoleOpts(course) {
   // Re-show rows if already selected
   if (selectedHoles > 0) {
     if (selectedHoles === 9 && nineIsDerived(course)) buildNineOpts();
+    if (selectedHoles === 18 && hasFullRound(course)) buildStartOpts();
     if (isCustomCourse(course)) buildParGrid(selectedHoles);
   }
 }
@@ -601,6 +645,7 @@ function openLobby() {
     btn.addEventListener('click', () => {
       selectedCourse = name;
       customHolePars = [];
+      selectedStart  = null;
       courseOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
       btn.classList.add('sel');
       const customInput = document.getElementById('customCourse');
@@ -649,16 +694,22 @@ function openLobby() {
 }
 
 function updateLobbyStartBtn() {
-  const needsNine = selectedHoles === 9 && nineIsDerived(selectedCourse);
-  const ready = selectedCourse.length > 0 && selectedHoles > 0 && (!needsNine || selectedNine);
+  const needsNine  = selectedHoles === 9  && nineIsDerived(selectedCourse);
+  const needsStart = selectedHoles === 18 && hasFullRound(selectedCourse);
+  const ready = selectedCourse.length > 0 && selectedHoles > 0
+    && (!needsNine  || selectedNine)
+    && (!needsStart || selectedStart);
   const btn = document.getElementById('lobbyStartBtn');
   btn.disabled = !ready;
-  const nineLabel = selectedNine ? ` (${selectedNine} 9)` : '';
+  const nineLabel  = selectedNine  ? ` (${selectedNine} 9)`             : '';
+  const startLabel = selectedStart ? ` from hole ${selectedStart === 'front' ? '1' : '10'}` : '';
   btn.textContent = ready
-    ? `Tee off → ${selectedHoles} holes at ${selectedCourse}${nineLabel}`
+    ? `Tee off → ${selectedHoles} holes at ${selectedCourse}${nineLabel}${startLabel}`
     : needsNine && !selectedNine
       ? 'Select front or back 9 →'
-      : 'Select a course & holes to start →';
+      : needsStart && !selectedStart
+        ? 'Select starting hole →'
+        : 'Select a course & holes to start →';
 }
 
 document.getElementById('lobbyStartBtn').addEventListener('click', () => {
