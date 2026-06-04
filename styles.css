@@ -424,18 +424,23 @@
   }
   .lobby-custom-input:focus { border-color: rgba(201,168,76,0.45); }
   .lobby-custom-input::placeholder { color: rgba(255,255,255,0.25); }
-  .par-grid { display: flex; flex-wrap: wrap; gap: 6px; }
-  .par-grid-item { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .par-grid-item span { font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 600; }
-  .par-grid-item input {
-    width: 36px; text-align: center;
+  .par-grid-vertical { display: flex; flex-direction: column; gap: 8px; }
+  .par-grid-row { display: flex; align-items: center; justify-content: space-between; }
+  .par-grid-num { font-size: 13px; font-weight: 600; color: rgba(255,255,255,0.55); min-width: 64px; }
+  .par-val-btn {
+    display: block; width: 44px;
     background: rgba(255,255,255,0.05);
     border: 1.5px solid rgba(255,255,255,0.12);
-    border-radius: 8px; color: var(--cream);
-    font-family: 'Karla', sans-serif; font-size: 14px; font-weight: 700;
-    padding: 6px 0; outline: none;
+    border-radius: 7px; color: rgba(255,255,255,0.55);
+    font-family: 'Karla', sans-serif; font-size: 13px; font-weight: 700;
+    padding: 5px 0; cursor: pointer; text-align: center;
+    transition: all 0.1s;
   }
-  .par-grid-item input:focus { border-color: rgba(201,168,76,0.45); }
+  .par-val-btn.sel {
+    background: rgba(201,168,76,0.18);
+    border-color: var(--gold); color: var(--gold);
+  }
+  .par-val-btn:active { transform: scale(0.9); }
   .lobby-hcp-stepper {
     display: flex; align-items: center;
     background: rgba(201,168,76,0.08);
