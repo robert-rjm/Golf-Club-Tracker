@@ -23,7 +23,7 @@ For the best experience, add it to your home screen. Works also in any mobile br
 2. Tap **Share → Add to Home Screen**
 3. Opens as a standalone app with no browser chrome
 
-## ⛳ Supported Courses
+## Supported Courses
 
 Course data (par, stroke index, SSS, slope) is stored in `courses.js`. Currently includes:
 
@@ -33,7 +33,7 @@ Course data (par, stroke index, SSS, slope) is stored in `courses.js`. Currently
 | St Genis - 5 Hole | 5 | 17 | N/A | ❌ |
 | Other | 9 - 18 | selectable | N/A | ❌ |
 
-> ℹ️ Stableford scoring requires SSS and slope to calculate your playing handicap. Courses without these values will still track clubs and shots — just without points.
+> Stableford scoring requires SSS and slope to calculate your playing handicap. Courses without these values will still track clubs and shots — just without points.
 
 ### Want your course added?
 **Open an Issue:**
