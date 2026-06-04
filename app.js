@@ -37,10 +37,12 @@ function getCourseData() {
   // Custom/Others course — build synthetic data from customHolePars (default par 4)
   if (selectedHoles > 0) {
     const baseHoles = Array.from({ length: selectedHoles }, (_, i) => ({
-      par: customHolePars[i] || 4, si: null
+      par: customHolePars[i] || null, si: null
     }));
     const holes = secondRound ? [...baseHoles, ...baseHoles] : baseHoles;
-    return { par: holes.reduce((s, h) => s + h.par, 0), sss: null, slope: null, holes };
+    const knownPars = holes.filter(h => h.par !== null);
+    const totalPar = knownPars.length ? knownPars.reduce((s, h) => s + h.par, 0) : null;
+    return { par: totalPar, sss: null, slope: null, holes };
   }
   return null;
 }
@@ -74,6 +76,7 @@ function strokesOnHole(holeIdx, playingHcp, course) {
 function stablefordPoints(holeIdx, grossShots, playingHcp, course) {
   if (!grossShots) return null;
   const par     = course.holes[holeIdx].par;
+  if (par === null) return null;
   const strokes = strokesOnHole(holeIdx, playingHcp, course);
   return Math.max(0, 2 + par + strokes - grossShots);
 }
@@ -274,7 +277,8 @@ function render() {
     if (cd && hole <= cd.holes.length) {
       const ph = calcPlayingHCP(cd, HOLES);
       const s  = strokesOnHole(hole - 1, ph, cd);
-      parEl.textContent = 'Par ' + cd.holes[hole-1].par + (s > 0 ? ' +' + s : '');
+      const holePar = cd.holes[hole-1].par;
+      parEl.textContent = holePar !== null ? 'Par ' + holePar + (s > 0 ? ' +' + s : '') : '';
     } else {
       parEl.textContent = '';
     }
@@ -391,7 +395,7 @@ document.getElementById('sumBtn').addEventListener('click', () => {
     if (cd && i < cd.holes.length) {
       const pts = stablefordPoints(i, shots.length, ph, cd);
       if (pts !== null) { totalSF += pts; sfHoles++; }
-      const parLabel = 'Par ' + cd.holes[i].par;
+      const parLabel = cd.holes[i].par !== null ? 'Par ' + cd.holes[i].par : '';
       sfCol = `<div class="sum-sf">
         <div class="sum-sf-pts">${pts !== null ? pts : '—'}</div>
         <div class="sum-sf-lbl">${parLabel}</div>
@@ -551,24 +555,56 @@ function buildNineOpts() {
   nineOpts.style.display = '';
 }
 
+function buildParPrompt(n) {
+  const prompt = document.getElementById('parPrompt');
+  const grid   = document.getElementById('parGrid');
+  grid.style.display = 'none';
+  grid.innerHTML = '';
+  prompt.innerHTML = '';
+  const label = document.createElement('div');
+  label.className = 'lobby-label';
+  label.style.marginBottom = '8px';
+  label.textContent = 'Par per hole (optional)';
+  prompt.appendChild(label);
+  const btn = document.createElement('button');
+  btn.className = 'lobby-opt';
+  btn.textContent = 'Set par per hole';
+  btn.addEventListener('click', () => {
+    prompt.style.display = 'none';
+    buildParGrid(n);
+  });
+  prompt.appendChild(btn);
+  prompt.style.display = '';
+}
+
 function buildParGrid(n) {
   const grid = document.getElementById('parGrid');
-  customHolePars = Array.from({ length: n }, (_, i) => customHolePars[i] || null);
-  grid.innerHTML = '<div class="lobby-label" style="margin-bottom:2px">Par per hole <span style="font-weight:400;opacity:0.5">(optional)</span></div><div class="par-grid" id="parGridInner"></div>';
+  // Default unset holes to par 4
+  customHolePars = Array.from({ length: n }, (_, i) => customHolePars[i] || 4);
+  grid.innerHTML = '<div class="lobby-label" style="margin-bottom:8px">Par per hole</div><div class="par-grid-vertical" id="parGridInner"></div>';
   const inner = grid.querySelector('#parGridInner');
   customHolePars.forEach((val, i) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'par-grid-item';
-    wrap.innerHTML = `<span>${i + 1}</span>`;
-    const inp = document.createElement('input');
-    inp.type = 'number'; inp.min = 3; inp.max = 6;
-    inp.placeholder = '4';
-    if (val) inp.value = val;
-    inp.addEventListener('input', () => {
-      customHolePars[i] = inp.value ? parseInt(inp.value) : null;
+    const row = document.createElement('div');
+    row.className = 'par-grid-row';
+    const num = document.createElement('span');
+    num.className = 'par-grid-num';
+    num.textContent = `Hole ${i + 1}`;
+    row.appendChild(num);
+    const btns = document.createElement('div');
+    btns.style.cssText = 'display:flex;gap:6px';
+    [3, 4, 5].forEach(p => {
+      const btn = document.createElement('button');
+      btn.className = 'par-val-btn' + (val === p ? ' sel' : '');
+      btn.textContent = p;
+      btn.addEventListener('click', () => {
+        customHolePars[i] = p;
+        btns.querySelectorAll('.par-val-btn').forEach(b => b.classList.remove('sel'));
+        btn.classList.add('sel');
+      });
+      btns.appendChild(btn);
     });
-    wrap.appendChild(inp);
-    inner.appendChild(wrap);
+    row.appendChild(btns);
+    inner.appendChild(row);
   });
   grid.style.display = '';
 }
@@ -580,15 +616,17 @@ function isCustomCourse(course) {
 }
 
 function buildHoleOpts(course) {
-  const holesOpts = document.getElementById('holesOpts');
-  const nineOpts  = document.getElementById('nineOpts');
-  const startOpts = document.getElementById('startOpts');
-  const parGrid   = document.getElementById('parGrid');
+  const holesOpts  = document.getElementById('holesOpts');
+  const nineOpts   = document.getElementById('nineOpts');
+  const startOpts  = document.getElementById('startOpts');
+  const parPrompt  = document.getElementById('parPrompt');
+  const parGrid    = document.getElementById('parGrid');
   const options = holeOptionsFor(course);
   // If current selectedHoles isn't valid for this course, reset it
   if (!options.includes(selectedHoles)) { selectedHoles = 0; selectedNine = null; selectedStart = null; }
   nineOpts.style.display = 'none';
   startOpts.style.display = 'none';
+  parPrompt.style.display = 'none';
   parGrid.style.display = 'none';
   holesOpts.innerHTML = '';
   options.forEach(n => {
@@ -615,10 +653,11 @@ function buildHoleOpts(course) {
         startOpts.style.display = 'none';
         startOpts.innerHTML = '';
       }
-      // Show per-hole par grid for custom/Others courses
+      // Show par prompt for custom/Others courses
       if (isCustomCourse(selectedCourse)) {
-        buildParGrid(n);
+        buildParPrompt(n);
       } else {
+        parPrompt.style.display = 'none';
         parGrid.style.display = 'none';
         parGrid.innerHTML = '';
       }
@@ -630,7 +669,7 @@ function buildHoleOpts(course) {
   if (selectedHoles > 0) {
     if (selectedHoles === 9 && nineIsDerived(course)) buildNineOpts();
     if (selectedHoles === 18 && hasFullRound(course)) buildStartOpts();
-    if (isCustomCourse(course)) buildParGrid(selectedHoles);
+    if (isCustomCourse(course)) buildParPrompt(selectedHoles);
   }
 }
 
