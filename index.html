@@ -256,6 +256,14 @@
     cursor: pointer; letter-spacing: 0.3px; transition: all 0.12s;
   }
   .sum-btn:active { background: rgba(201,168,76,0.25); transform: scale(0.97); }
+  .add-nine-btn {
+    flex: 1; background: rgba(61,112,51,0.15);
+    border: 1px solid rgba(61,112,51,0.4); color: var(--turf);
+    border-radius: 12px; padding: 13px;
+    font-family: 'Karla', sans-serif; font-size: 14px; font-weight: 700;
+    cursor: pointer; letter-spacing: 0.3px; transition: all 0.12s;
+  }
+  .add-nine-btn:active { background: rgba(61,112,51,0.3); transform: scale(0.97); }
 
   /* ── OVERLAYS (shared) ── */
   .overlay {
@@ -520,9 +528,19 @@
 
   <div class="bottom-bar">
     <button class="undo-btn" id="undoBtn">↩ Undo</button>
+    <button class="add-nine-btn" id="addNineBtn" style="display:none">+ Continue round</button>
     <button class="sum-btn" id="sumBtn">📋 Round Summary</button>
   </div>
 </div>
+
+<!-- Continue-round sheet -->
+<div id="continueSheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;
+  background:var(--card);border-top:1px solid rgba(255,255,255,0.08);
+  border-radius:20px 20px 0 0;padding:20px 18px 32px;box-shadow:0 -8px 32px rgba(0,0,0,0.4)">
+  <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.45);letter-spacing:0.5px;margin-bottom:14px">CONTINUE WITH</div>
+  <div id="continueOpts" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+</div>
+<div id="continueBackdrop" style="display:none;position:fixed;inset:0;z-index:199;background:rgba(0,0,0,0.45)"></div>
 
 <!-- Lobby overlay -->
 <div class="overlay" id="lobbyOverlay">
@@ -542,6 +560,7 @@
       <div class="lobby-label">Holes</div>
       <div class="lobby-opts" id="holesOpts"></div>
       <div class="lobby-opts" id="nineOpts" style="display:none;margin-top:6px"></div>
+
       <div id="parGrid" style="display:none;margin-top:10px"></div>
     </div>
     <div class="lobby-section">
@@ -583,12 +602,18 @@ const ALL_CLUBS = {
   'Wedges':         ['PW', 'PA', 'GW', 'AW', 'SW', 'LW']
 };
 
+function withSecondRound(courseObj) {
+  if (!secondRound) return courseObj;
+  const holes = [...courseObj.holes, ...courseObj.holes];
+  return { ...courseObj, holes, par: holes.reduce((s, h) => s + h.par, 0) };
+}
+
 function getCourseData() {
   // Check for an explicit entry first
   const explicit = Object.values(COURSES).find(c =>
     courseBaseName(c) === selectedCourse && c.holes.length === selectedHoles
   );
-  if (explicit) return explicit;
+  if (explicit) return withSecondRound(explicit);
   // For 9 holes derived from an 18-hole entry (front or back nine)
   if (selectedHoles === 9 && selectedNine) {
     const full = Object.values(COURSES).find(c =>
@@ -596,17 +621,23 @@ function getCourseData() {
     );
     if (full) {
       const holes = selectedNine === 'front' ? full.holes.slice(0, 9) : full.holes.slice(9, 18);
-      return { ...full, holes, par: holes.reduce((s, h) => s + h.par, 0) };
+      return withSecondRound({ ...full, holes, par: holes.reduce((s, h) => s + h.par, 0) });
     }
   }
   // Custom/Others course — build synthetic data from customHolePars (default par 4)
   if (selectedHoles > 0) {
-    const holes = Array.from({ length: selectedHoles }, (_, i) => ({
+    const baseHoles = Array.from({ length: selectedHoles }, (_, i) => ({
       par: customHolePars[i] || 4, si: null
     }));
+    const holes = secondRound ? [...baseHoles, ...baseHoles] : baseHoles;
     return { par: holes.reduce((s, h) => s + h.par, 0), sss: null, slope: null, holes };
   }
   return null;
+}
+
+// Total holes being played (accounts for second round)
+function totalHolesPlayed() {
+  return selectedHoles * (secondRound ? 2 : 1);
 }
 
 // Returns the base course name (strips ' - X Hole' suffix if present)
@@ -651,6 +682,7 @@ const HOLE_OPTIONS   = [5, 9, 18];
 let selectedCourse   = '';
 let selectedHoles    = 0;   // 0 = not yet chosen
 let selectedNine     = null; // 'front' | 'back' | null — only used when 9 holes derived from 18
+let secondRound      = false; // play the selected holes twice (e.g. 9 → 18)
 let customHolePars   = [];   // per-hole par for custom/Others courses (null = not set)
 let hcp              = 33;
 
@@ -839,6 +871,10 @@ function render() {
   // Lock settings gear once round is started
   document.getElementById('settingsBtn').classList.toggle('locked', roundStarted());
 
+  // Show "Continue round" button on last hole if second round not yet added
+  const addNineBtn = document.getElementById('addNineBtn');
+  addNineBtn.style.display = (hole === HOLES && !secondRound) ? '' : 'none';
+
   const shots = round[hole - 1];
   const countEl = document.getElementById('shotCount');
   if (countEl) countEl.textContent = shots.length > 0 ? shots.length : '';
@@ -865,6 +901,52 @@ function render() {
 // ── NAV ──
 document.getElementById('prev').addEventListener('click', () => { if (hole > 1)    { hole--; saveState(); render(); }});
 document.getElementById('next').addEventListener('click', () => { if (hole < HOLES) { hole++; saveState(); render(); }});
+
+// ── ADD SECOND ROUND ──
+function activateSecondRound(newNine) {
+  // newNine: 'front' | 'back' | null (null = repeat same)
+  secondRound = true;
+  if (newNine) selectedNine = newNine;
+  HOLES = selectedHoles * 2;
+  while (round.length < HOLES) round.push([]);
+  saveState();
+  buildStrip();
+  render();
+}
+
+function closeContinueSheet() {
+  document.getElementById('continueSheet').style.display = 'none';
+  document.getElementById('continueBackdrop').style.display = 'none';
+}
+
+document.getElementById('continueBackdrop').addEventListener('click', closeContinueSheet);
+
+document.getElementById('addNineBtn').addEventListener('click', () => {
+  // Only prompt for front/back when course has 18-hole data and we played a derived 9
+  if (selectedHoles === 9 && nineIsDerived(selectedCourse)) {
+    const opts = document.getElementById('continueOpts');
+    opts.innerHTML = '';
+    const choices = [
+      { label: `Same 9 (${selectedNine === 'front' ? 'Front' : 'Back'} again)`, nine: null },
+      { label: selectedNine === 'front' ? 'Back 9' : 'Front 9', nine: selectedNine === 'front' ? 'back' : 'front' }
+    ];
+    choices.forEach(({ label, nine }) => {
+      const btn = document.createElement('button');
+      btn.className = 'lobby-opt';
+      btn.style.cssText = 'flex:1;padding:14px;font-size:15px';
+      btn.textContent = label;
+      btn.addEventListener('click', () => {
+        closeContinueSheet();
+        activateSecondRound(nine);
+      });
+      opts.appendChild(btn);
+    });
+    document.getElementById('continueSheet').style.display = '';
+    document.getElementById('continueBackdrop').style.display = '';
+  } else {
+    activateSecondRound(null);
+  }
+});
 
 // ── UNDO ──
 document.getElementById('undoBtn').addEventListener('click', () => {
@@ -1032,6 +1114,7 @@ function buildNineOpts() {
   nineOpts.style.display = '';
 }
 
+
 function buildParGrid(n) {
   const grid = document.getElementById('parGrid');
   customHolePars = Array.from({ length: n }, (_, i) => customHolePars[i] || null);
@@ -1180,6 +1263,7 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   const hcpInput = document.getElementById('hcpInput');
   const v = parseInt(hcpInput.value, 10);
   hcp = isNaN(v) ? 33 : Math.min(54, Math.max(0, v));
+  secondRound = false;
   HOLES = selectedHoles;
   round = Array.from({length: HOLES}, () => []);
   hole  = 1;
