@@ -427,6 +427,18 @@
   }
   .lobby-custom-input:focus { border-color: rgba(201,168,76,0.45); }
   .lobby-custom-input::placeholder { color: rgba(255,255,255,0.25); }
+  .par-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .par-grid-item { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .par-grid-item span { font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 600; }
+  .par-grid-item input {
+    width: 36px; text-align: center;
+    background: rgba(255,255,255,0.05);
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-radius: 8px; color: var(--cream);
+    font-family: 'Karla', sans-serif; font-size: 14px; font-weight: 700;
+    padding: 6px 0; outline: none;
+  }
+  .par-grid-item input:focus { border-color: rgba(201,168,76,0.45); }
   .lobby-hcp-stepper {
     display: flex; align-items: center;
     background: rgba(201,168,76,0.08);
@@ -530,6 +542,7 @@
       <div class="lobby-label">Holes</div>
       <div class="lobby-opts" id="holesOpts"></div>
       <div class="lobby-opts" id="nineOpts" style="display:none;margin-top:6px"></div>
+      <div id="parGrid" style="display:none;margin-top:10px"></div>
     </div>
     <div class="lobby-section">
       <div class="lobby-label">Handicap (HCP)</div>
@@ -586,6 +599,13 @@ function getCourseData() {
       return { ...full, holes, par: holes.reduce((s, h) => s + h.par, 0) };
     }
   }
+  // Custom/Others course — build synthetic data from customHolePars (default par 4)
+  if (selectedHoles > 0) {
+    const holes = Array.from({ length: selectedHoles }, (_, i) => ({
+      par: customHolePars[i] || 4, si: null
+    }));
+    return { par: holes.reduce((s, h) => s + h.par, 0), sss: null, slope: null, holes };
+  }
   return null;
 }
 
@@ -631,6 +651,7 @@ const HOLE_OPTIONS   = [5, 9, 18];
 let selectedCourse   = '';
 let selectedHoles    = 0;   // 0 = not yet chosen
 let selectedNine     = null; // 'front' | 'back' | null — only used when 9 holes derived from 18
+let customHolePars   = [];   // per-hole par for custom/Others courses (null = not set)
 let hcp              = 33;
 
 // ── LOCALSTORAGE ──
@@ -978,14 +999,18 @@ function holeOptionsFor(course) {
   const set = new Set(counts);
   // Any course with an 18-hole entry also offers 9 (front or back)
   if (set.has(18)) set.add(9);
+  // Unknown/custom courses default to 9 and 18
+  if (set.size === 0) { set.add(9); set.add(18); }
   return [...set].sort((a, b) => a - b);
 }
 
-// Returns true if 9 holes for this course is derived from 18 (no explicit 9-hole entry)
+// Returns true if 9 holes for this course is derived from an 18-hole entry (not explicit, not unknown)
 function nineIsDerived(course) {
-  const hasExplicit9 = Object.keys(COURSES).some(k =>
-    k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course && COURSES[k].holes.length === 9
+  const entries = Object.keys(COURSES).filter(k =>
+    k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course
   );
+  if (entries.length === 0) return false; // unknown/custom course — no data to derive from
+  const hasExplicit9 = entries.some(k => COURSES[k].holes.length === 9);
   return !hasExplicit9;
 }
 
@@ -1007,13 +1032,43 @@ function buildNineOpts() {
   nineOpts.style.display = '';
 }
 
+function buildParGrid(n) {
+  const grid = document.getElementById('parGrid');
+  customHolePars = Array.from({ length: n }, (_, i) => customHolePars[i] || null);
+  grid.innerHTML = '<div class="lobby-label" style="margin-bottom:2px">Par per hole <span style="font-weight:400;opacity:0.5">(optional)</span></div><div class="par-grid" id="parGridInner"></div>';
+  const inner = grid.querySelector('#parGridInner');
+  customHolePars.forEach((val, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'par-grid-item';
+    wrap.innerHTML = `<span>${i + 1}</span>`;
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.min = 3; inp.max = 6;
+    inp.placeholder = '4';
+    if (val) inp.value = val;
+    inp.addEventListener('input', () => {
+      customHolePars[i] = inp.value ? parseInt(inp.value) : null;
+    });
+    wrap.appendChild(inp);
+    inner.appendChild(wrap);
+  });
+  grid.style.display = '';
+}
+
+function isCustomCourse(course) {
+  return Object.keys(COURSES).filter(k =>
+    k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course
+  ).length === 0;
+}
+
 function buildHoleOpts(course) {
   const holesOpts = document.getElementById('holesOpts');
   const nineOpts  = document.getElementById('nineOpts');
+  const parGrid   = document.getElementById('parGrid');
   const options = holeOptionsFor(course);
   // If current selectedHoles isn't valid for this course, reset it
   if (!options.includes(selectedHoles)) { selectedHoles = 0; selectedNine = null; }
   nineOpts.style.display = 'none';
+  parGrid.style.display = 'none';
   holesOpts.innerHTML = '';
   options.forEach(n => {
     const btn = document.createElement('button');
@@ -1031,12 +1086,22 @@ function buildHoleOpts(course) {
         nineOpts.style.display = 'none';
         nineOpts.innerHTML = '';
       }
+      // Show per-hole par grid for custom/Others courses
+      if (isCustomCourse(selectedCourse)) {
+        buildParGrid(n);
+      } else {
+        parGrid.style.display = 'none';
+        parGrid.innerHTML = '';
+      }
       updateLobbyStartBtn();
     });
     holesOpts.appendChild(btn);
   });
-  // Re-show front/back row if 9 is already selected and derived
-  if (selectedHoles === 9 && nineIsDerived(course)) buildNineOpts();
+  // Re-show rows if already selected
+  if (selectedHoles > 0) {
+    if (selectedHoles === 9 && nineIsDerived(course)) buildNineOpts();
+    if (isCustomCourse(course)) buildParGrid(selectedHoles);
+  }
 }
 
 function openLobby() {
@@ -1049,6 +1114,7 @@ function openLobby() {
     btn.textContent = name;
     btn.addEventListener('click', () => {
       selectedCourse = name;
+      customHolePars = [];
       courseOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
       btn.classList.add('sel');
       const customInput = document.getElementById('customCourse');
