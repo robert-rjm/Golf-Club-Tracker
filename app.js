@@ -111,18 +111,21 @@ function saveState() {
   localStorage.setItem('gct_hole',   hole);
   localStorage.setItem('gct_bag',    JSON.stringify(activeBag));
   localStorage.setItem('gct_holes',  HOLES);
-  localStorage.setItem('gct_course', selectedCourse);
-  localStorage.setItem('gct_hcp',    hcp);
+  localStorage.setItem('gct_course',    selectedCourse);
+  localStorage.setItem('gct_hcp',       hcp);
+  localStorage.setItem('gct_custompars', JSON.stringify(customHolePars));
 }
 function loadState() {
-  const savedRound  = localStorage.getItem('gct_round');
-  const savedHole   = localStorage.getItem('gct_hole');
-  const savedHoles  = localStorage.getItem('gct_holes');
-  const savedCourse = localStorage.getItem('gct_course');
-  if (savedRound)  round          = JSON.parse(savedRound);
-  if (savedHole)   hole           = parseInt(savedHole, 10);
-  if (savedHoles)  { HOLES = parseInt(savedHoles, 10); selectedHoles = HOLES; }
-  if (savedCourse) selectedCourse = savedCourse;
+  const savedRound      = localStorage.getItem('gct_round');
+  const savedHole       = localStorage.getItem('gct_hole');
+  const savedHoles      = localStorage.getItem('gct_holes');
+  const savedCourse     = localStorage.getItem('gct_course');
+  const savedCustomPars = localStorage.getItem('gct_custompars');
+  if (savedRound)      round          = JSON.parse(savedRound);
+  if (savedHole)       hole           = parseInt(savedHole, 10);
+  if (savedHoles)      { HOLES = parseInt(savedHoles, 10); selectedHoles = HOLES; }
+  if (savedCourse)     selectedCourse = savedCourse;
+  if (savedCustomPars) customHolePars = JSON.parse(savedCustomPars);
 }
 loadState();
 
@@ -600,6 +603,7 @@ function buildParGrid(n) {
         customHolePars[i] = p;
         btns.querySelectorAll('.par-val-btn').forEach(b => b.classList.remove('sel'));
         btn.classList.add('sel');
+        saveState();
       });
       btns.appendChild(btn);
     });
@@ -685,6 +689,7 @@ function openLobby() {
       selectedCourse = name;
       customHolePars = [];
       selectedStart  = null;
+      saveState();
       courseOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
       btn.classList.add('sel');
       const customInput = document.getElementById('customCourse');
