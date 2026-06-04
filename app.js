@@ -71,10 +71,13 @@ function stablefordPoints(holeIdx, grossShots, playingHcp, course) {
   return Math.max(0, 2 + par + strokes - grossShots);
 }
 
-// My default bag — loaded on every fresh page open
-const DEFAULT_BAG = ['D', '5W', '5H', '5i', '6i', '7i', '8i', '9i', 'PW', 'PA', 'AW', 'SW'];
+// ── DEFAULTS (first visit only) ──
+const DEFAULT_BAG = ['D', '3W', '5W', '4H', '5i', '6i', '7i', '8i', '9i', 'PW', 'AW', 'SW'];
+const DEFAULT_HCP = 54;
 
-let activeBag = [...DEFAULT_BAG];
+let activeBag = localStorage.getItem('gct_bag')
+  ? JSON.parse(localStorage.getItem('gct_bag'))
+  : [...DEFAULT_BAG];
 
 let HOLES = 18;
 let hole  = 1;
@@ -87,7 +90,9 @@ let selectedHoles    = 0;   // 0 = not yet chosen
 let selectedNine     = null; // 'front' | 'back' | null — only used when 9 holes derived from 18
 let secondRound      = false; // play the selected holes twice (e.g. 9 → 18)
 let customHolePars   = [];   // per-hole par for custom/Others courses (null = not set)
-let hcp              = 33;
+let hcp = localStorage.getItem('gct_hcp') !== null
+  ? parseInt(localStorage.getItem('gct_hcp'), 10)
+  : DEFAULT_HCP;
 
 // ── LOCALSTORAGE ──
 function saveState() {
@@ -101,16 +106,12 @@ function saveState() {
 function loadState() {
   const savedRound  = localStorage.getItem('gct_round');
   const savedHole   = localStorage.getItem('gct_hole');
-  const savedBag    = localStorage.getItem('gct_bag');
   const savedHoles  = localStorage.getItem('gct_holes');
   const savedCourse = localStorage.getItem('gct_course');
-  const savedHcp    = localStorage.getItem('gct_hcp');
   if (savedRound)  round          = JSON.parse(savedRound);
   if (savedHole)   hole           = parseInt(savedHole, 10);
-  if (savedBag)    activeBag      = JSON.parse(savedBag);
   if (savedHoles)  { HOLES = parseInt(savedHoles, 10); selectedHoles = HOLES; }
   if (savedCourse) selectedCourse = savedCourse;
-  if (savedHcp !== null) hcp      = parseInt(savedHcp, 10);
 }
 loadState();
 
