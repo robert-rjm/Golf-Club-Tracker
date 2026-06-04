@@ -256,6 +256,14 @@
     cursor: pointer; letter-spacing: 0.3px; transition: all 0.12s;
   }
   .sum-btn:active { background: rgba(201,168,76,0.25); transform: scale(0.97); }
+  .add-nine-btn {
+    flex: 1; background: rgba(61,112,51,0.15);
+    border: 1px solid rgba(61,112,51,0.4); color: var(--turf);
+    border-radius: 12px; padding: 13px;
+    font-family: 'Karla', sans-serif; font-size: 14px; font-weight: 700;
+    cursor: pointer; letter-spacing: 0.3px; transition: all 0.12s;
+  }
+  .add-nine-btn:active { background: rgba(61,112,51,0.3); transform: scale(0.97); }
 
   /* ── OVERLAYS (shared) ── */
   .overlay {
@@ -427,6 +435,18 @@
   }
   .lobby-custom-input:focus { border-color: rgba(201,168,76,0.45); }
   .lobby-custom-input::placeholder { color: rgba(255,255,255,0.25); }
+  .par-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .par-grid-item { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .par-grid-item span { font-size: 10px; color: rgba(255,255,255,0.4); font-weight: 600; }
+  .par-grid-item input {
+    width: 36px; text-align: center;
+    background: rgba(255,255,255,0.05);
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-radius: 8px; color: var(--cream);
+    font-family: 'Karla', sans-serif; font-size: 14px; font-weight: 700;
+    padding: 6px 0; outline: none;
+  }
+  .par-grid-item input:focus { border-color: rgba(201,168,76,0.45); }
   .lobby-hcp-stepper {
     display: flex; align-items: center;
     background: rgba(201,168,76,0.08);
@@ -508,9 +528,19 @@
 
   <div class="bottom-bar">
     <button class="undo-btn" id="undoBtn">↩ Undo</button>
+    <button class="add-nine-btn" id="addNineBtn" style="display:none">+ Continue round</button>
     <button class="sum-btn" id="sumBtn">📋 Round Summary</button>
   </div>
 </div>
+
+<!-- Continue-round sheet -->
+<div id="continueSheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;
+  background:var(--card);border-top:1px solid rgba(255,255,255,0.08);
+  border-radius:20px 20px 0 0;padding:20px 18px 32px;box-shadow:0 -8px 32px rgba(0,0,0,0.4)">
+  <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.45);letter-spacing:0.5px;margin-bottom:14px">CONTINUE WITH</div>
+  <div id="continueOpts" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+</div>
+<div id="continueBackdrop" style="display:none;position:fixed;inset:0;z-index:199;background:rgba(0,0,0,0.45)"></div>
 
 <!-- Lobby overlay -->
 <div class="overlay" id="lobbyOverlay">
@@ -529,6 +559,9 @@
     <div class="lobby-section">
       <div class="lobby-label">Holes</div>
       <div class="lobby-opts" id="holesOpts"></div>
+      <div class="lobby-opts" id="nineOpts" style="display:none;margin-top:6px"></div>
+
+      <div id="parGrid" style="display:none;margin-top:10px"></div>
     </div>
     <div class="lobby-section">
       <div class="lobby-label">Handicap (HCP)</div>
@@ -560,6 +593,7 @@
   <button class="settings-start-btn" id="startRoundBtn">Start Round →</button>
 </div>
 
+<script src="courses.js"></script>
 <script>
 // ── ALL AVAILABLE CLUBS ──
 const ALL_CLUBS = {
@@ -568,35 +602,48 @@ const ALL_CLUBS = {
   'Wedges':         ['PW', 'PA', 'GW', 'AW', 'SW', 'LW']
 };
 
-// ── COURSE DATA ──
-const COURSES = {
-  'Golfclub St Genis': {
-    par: 74, sss: 70.2, slope: 131,
-    holes: [
-      { par: 4, si: 1  },
-      { par: 5, si: 11 },
-      { par: 4, si: 13 },
-      { par: 3, si: 17 },
-      { par: 4, si: 15 },
-      { par: 4, si: 5  },
-      { par: 5, si: 3  },
-      { par: 3, si: 7  },
-      { par: 5, si: 9  },
-      { par: 4, si: 2  },
-      { par: 5, si: 12 },
-      { par: 4, si: 14 },
-      { par: 3, si: 18 },
-      { par: 4, si: 16 },
-      { par: 4, si: 6  },
-      { par: 5, si: 4  },
-      { par: 3, si: 8  },
-      { par: 5, si: 10 },
-    ]
-  }
-};
+function withSecondRound(courseObj) {
+  if (!secondRound) return courseObj;
+  const holes = [...courseObj.holes, ...courseObj.holes];
+  return { ...courseObj, holes, par: holes.reduce((s, h) => s + h.par, 0) };
+}
 
 function getCourseData() {
-  return COURSES[selectedCourse] || null;
+  // Check for an explicit entry first
+  const explicit = Object.values(COURSES).find(c =>
+    courseBaseName(c) === selectedCourse && c.holes.length === selectedHoles
+  );
+  if (explicit) return withSecondRound(explicit);
+  // For 9 holes derived from an 18-hole entry (front or back nine)
+  if (selectedHoles === 9 && selectedNine) {
+    const full = Object.values(COURSES).find(c =>
+      courseBaseName(c) === selectedCourse && c.holes.length === 18
+    );
+    if (full) {
+      const holes = selectedNine === 'front' ? full.holes.slice(0, 9) : full.holes.slice(9, 18);
+      return withSecondRound({ ...full, holes, par: holes.reduce((s, h) => s + h.par, 0) });
+    }
+  }
+  // Custom/Others course — build synthetic data from customHolePars (default par 4)
+  if (selectedHoles > 0) {
+    const baseHoles = Array.from({ length: selectedHoles }, (_, i) => ({
+      par: customHolePars[i] || 4, si: null
+    }));
+    const holes = secondRound ? [...baseHoles, ...baseHoles] : baseHoles;
+    return { par: holes.reduce((s, h) => s + h.par, 0), sss: null, slope: null, holes };
+  }
+  return null;
+}
+
+// Total holes being played (accounts for second round)
+function totalHolesPlayed() {
+  return selectedHoles * (secondRound ? 2 : 1);
+}
+
+// Returns the base course name (strips ' - X Hole' suffix if present)
+function courseBaseName(courseData) {
+  const key = Object.keys(COURSES).find(k => COURSES[k] === courseData);
+  return key ? key.replace(/\s*-\s*\d+\s*Hole$/i, '') : '';
 }
 
 // WHS course handicap → adjusted for number of holes played
@@ -631,10 +678,12 @@ let hole  = 1;
 let round = Array.from({length: HOLES}, () => []);
 
 // ── LOBBY STATE ──
-const PRESET_COURSES = ['Golfclub St Genis', 'Others'];
 const HOLE_OPTIONS   = [5, 9, 18];
 let selectedCourse   = '';
 let selectedHoles    = 0;   // 0 = not yet chosen
+let selectedNine     = null; // 'front' | 'back' | null — only used when 9 holes derived from 18
+let secondRound      = false; // play the selected holes twice (e.g. 9 → 18)
+let customHolePars   = [];   // per-hole par for custom/Others courses (null = not set)
 let hcp              = 33;
 
 // ── LOCALSTORAGE ──
@@ -822,6 +871,10 @@ function render() {
   // Lock settings gear once round is started
   document.getElementById('settingsBtn').classList.toggle('locked', roundStarted());
 
+  // Show "Continue round" button on last hole if second round not yet added
+  const addNineBtn = document.getElementById('addNineBtn');
+  addNineBtn.style.display = (hole === HOLES && !secondRound) ? '' : 'none';
+
   const shots = round[hole - 1];
   const countEl = document.getElementById('shotCount');
   if (countEl) countEl.textContent = shots.length > 0 ? shots.length : '';
@@ -848,6 +901,52 @@ function render() {
 // ── NAV ──
 document.getElementById('prev').addEventListener('click', () => { if (hole > 1)    { hole--; saveState(); render(); }});
 document.getElementById('next').addEventListener('click', () => { if (hole < HOLES) { hole++; saveState(); render(); }});
+
+// ── ADD SECOND ROUND ──
+function activateSecondRound(newNine) {
+  // newNine: 'front' | 'back' | null (null = repeat same)
+  secondRound = true;
+  if (newNine) selectedNine = newNine;
+  HOLES = selectedHoles * 2;
+  while (round.length < HOLES) round.push([]);
+  saveState();
+  buildStrip();
+  render();
+}
+
+function closeContinueSheet() {
+  document.getElementById('continueSheet').style.display = 'none';
+  document.getElementById('continueBackdrop').style.display = 'none';
+}
+
+document.getElementById('continueBackdrop').addEventListener('click', closeContinueSheet);
+
+document.getElementById('addNineBtn').addEventListener('click', () => {
+  // Only prompt for front/back when course has 18-hole data and we played a derived 9
+  if (selectedHoles === 9 && nineIsDerived(selectedCourse)) {
+    const opts = document.getElementById('continueOpts');
+    opts.innerHTML = '';
+    const choices = [
+      { label: `Same 9 (${selectedNine === 'front' ? 'Front' : 'Back'} again)`, nine: null },
+      { label: selectedNine === 'front' ? 'Back 9' : 'Front 9', nine: selectedNine === 'front' ? 'back' : 'front' }
+    ];
+    choices.forEach(({ label, nine }) => {
+      const btn = document.createElement('button');
+      btn.className = 'lobby-opt';
+      btn.style.cssText = 'flex:1;padding:14px;font-size:15px';
+      btn.textContent = label;
+      btn.addEventListener('click', () => {
+        closeContinueSheet();
+        activateSecondRound(nine);
+      });
+      opts.appendChild(btn);
+    });
+    document.getElementById('continueSheet').style.display = '';
+    document.getElementById('continueBackdrop').style.display = '';
+  } else {
+    activateSecondRound(null);
+  }
+});
 
 // ── UNDO ──
 document.getElementById('undoBtn').addEventListener('click', () => {
@@ -976,15 +1075,83 @@ document.getElementById('newRoundBtn').addEventListener('click', () => {
 
 // ── LOBBY ──
 function holeOptionsFor(course) {
-  // 5-hole option only available at St Genis
-  return course === 'Golfclub St Genis' ? [5, 9, 18] : [9, 18];
+  const counts = Object.keys(COURSES)
+    .filter(k => k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course)
+    .map(k => COURSES[k].holes.length);
+  const set = new Set(counts);
+  // Any course with an 18-hole entry also offers 9 (front or back)
+  if (set.has(18)) set.add(9);
+  // Unknown/custom courses default to 9 and 18
+  if (set.size === 0) { set.add(9); set.add(18); }
+  return [...set].sort((a, b) => a - b);
+}
+
+// Returns true if 9 holes for this course is derived from an 18-hole entry (not explicit, not unknown)
+function nineIsDerived(course) {
+  const entries = Object.keys(COURSES).filter(k =>
+    k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course
+  );
+  if (entries.length === 0) return false; // unknown/custom course — no data to derive from
+  const hasExplicit9 = entries.some(k => COURSES[k].holes.length === 9);
+  return !hasExplicit9;
+}
+
+function buildNineOpts() {
+  const nineOpts = document.getElementById('nineOpts');
+  nineOpts.innerHTML = '';
+  ['front', 'back'].forEach(side => {
+    const btn = document.createElement('button');
+    btn.className = 'lobby-opt' + (selectedNine === side ? ' sel' : '');
+    btn.textContent = side.charAt(0).toUpperCase() + side.slice(1) + ' 9';
+    btn.addEventListener('click', () => {
+      selectedNine = side;
+      nineOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      updateLobbyStartBtn();
+    });
+    nineOpts.appendChild(btn);
+  });
+  nineOpts.style.display = '';
+}
+
+
+function buildParGrid(n) {
+  const grid = document.getElementById('parGrid');
+  customHolePars = Array.from({ length: n }, (_, i) => customHolePars[i] || null);
+  grid.innerHTML = '<div class="lobby-label" style="margin-bottom:2px">Par per hole <span style="font-weight:400;opacity:0.5">(optional)</span></div><div class="par-grid" id="parGridInner"></div>';
+  const inner = grid.querySelector('#parGridInner');
+  customHolePars.forEach((val, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'par-grid-item';
+    wrap.innerHTML = `<span>${i + 1}</span>`;
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.min = 3; inp.max = 6;
+    inp.placeholder = '4';
+    if (val) inp.value = val;
+    inp.addEventListener('input', () => {
+      customHolePars[i] = inp.value ? parseInt(inp.value) : null;
+    });
+    wrap.appendChild(inp);
+    inner.appendChild(wrap);
+  });
+  grid.style.display = '';
+}
+
+function isCustomCourse(course) {
+  return Object.keys(COURSES).filter(k =>
+    k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course
+  ).length === 0;
 }
 
 function buildHoleOpts(course) {
   const holesOpts = document.getElementById('holesOpts');
+  const nineOpts  = document.getElementById('nineOpts');
+  const parGrid   = document.getElementById('parGrid');
   const options = holeOptionsFor(course);
   // If current selectedHoles isn't valid for this course, reset it
-  if (!options.includes(selectedHoles)) selectedHoles = 0;
+  if (!options.includes(selectedHoles)) { selectedHoles = 0; selectedNine = null; }
+  nineOpts.style.display = 'none';
+  parGrid.style.display = 'none';
   holesOpts.innerHTML = '';
   options.forEach(n => {
     const btn = document.createElement('button');
@@ -992,12 +1159,32 @@ function buildHoleOpts(course) {
     btn.textContent = n + ' holes';
     btn.addEventListener('click', () => {
       selectedHoles = n;
+      selectedNine = null;
       holesOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
       btn.classList.add('sel');
+      // Show front/back prompt if 9 holes is derived from 18
+      if (n === 9 && nineIsDerived(selectedCourse)) {
+        buildNineOpts();
+      } else {
+        nineOpts.style.display = 'none';
+        nineOpts.innerHTML = '';
+      }
+      // Show per-hole par grid for custom/Others courses
+      if (isCustomCourse(selectedCourse)) {
+        buildParGrid(n);
+      } else {
+        parGrid.style.display = 'none';
+        parGrid.innerHTML = '';
+      }
       updateLobbyStartBtn();
     });
     holesOpts.appendChild(btn);
   });
+  // Re-show rows if already selected
+  if (selectedHoles > 0) {
+    if (selectedHoles === 9 && nineIsDerived(course)) buildNineOpts();
+    if (isCustomCourse(course)) buildParGrid(selectedHoles);
+  }
 }
 
 function openLobby() {
@@ -1010,6 +1197,7 @@ function openLobby() {
     btn.textContent = name;
     btn.addEventListener('click', () => {
       selectedCourse = name;
+      customHolePars = [];
       courseOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
       btn.classList.add('sel');
       const customInput = document.getElementById('customCourse');
@@ -1058,12 +1246,16 @@ function openLobby() {
 }
 
 function updateLobbyStartBtn() {
-  const ready = selectedCourse.length > 0 && selectedHoles > 0;
+  const needsNine = selectedHoles === 9 && nineIsDerived(selectedCourse);
+  const ready = selectedCourse.length > 0 && selectedHoles > 0 && (!needsNine || selectedNine);
   const btn = document.getElementById('lobbyStartBtn');
   btn.disabled = !ready;
+  const nineLabel = selectedNine ? ` (${selectedNine} 9)` : '';
   btn.textContent = ready
-    ? `Tee off → ${selectedHoles} holes at ${selectedCourse}`
-    : 'Select a course & holes to start →';
+    ? `Tee off → ${selectedHoles} holes at ${selectedCourse}${nineLabel}`
+    : needsNine && !selectedNine
+      ? 'Select front or back 9 →'
+      : 'Select a course & holes to start →';
 }
 
 document.getElementById('lobbyStartBtn').addEventListener('click', () => {
@@ -1071,6 +1263,7 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   const hcpInput = document.getElementById('hcpInput');
   const v = parseInt(hcpInput.value, 10);
   hcp = isNaN(v) ? 33 : Math.min(54, Math.max(0, v));
+  secondRound = false;
   HOLES = selectedHoles;
   round = Array.from({length: HOLES}, () => []);
   hole  = 1;
