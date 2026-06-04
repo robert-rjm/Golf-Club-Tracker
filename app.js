@@ -72,7 +72,7 @@ function stablefordPoints(holeIdx, grossShots, playingHcp, course) {
 }
 
 // ── DEFAULTS (first visit only) ──
-const DEFAULT_BAG = ['D', '3W', '5W', '4H', '5i', '6i', '7i', '8i', '9i', 'PW', 'AW', 'SW'];
+const DEFAULT_BAG = ['D', '3W', '5W', '5H', '5i', '6i', '7i', '8i', '9i', 'PW', 'SW'];
 const DEFAULT_HCP = 54;
 
 let activeBag = localStorage.getItem('gct_bag')
@@ -221,7 +221,7 @@ function buildClubButtons() {
   penaltyGroup.appendChild(penaltyBtn);
   area.appendChild(penaltyGroup);
 }
-  
+
 // ── PUTTER HELPERS ──
 function getPutterCount() {
   return round[hole-1].filter(c => c === 'Putter').length;
