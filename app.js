@@ -42,7 +42,7 @@ function getCourseData() {
     const holes = secondRound ? [...baseHoles, ...baseHoles] : baseHoles;
     const knownPars = holes.filter(h => h.par !== null);
     const totalPar = knownPars.length ? knownPars.reduce((s, h) => s + h.par, 0) : null;
-    return { par: totalPar, sss: null, slope: null, holes };
+    return { par: totalPar, sss: customSSS, slope: customSlope, holes };
   }
   return null;
 }
@@ -101,6 +101,8 @@ let selectedNine     = null; // 'front' | 'back' | null — only used when 9 hol
 let selectedStart    = null; // 'front' | 'back' | null — which 9 to start on for a full 18
 let secondRound      = false; // play the selected holes twice (e.g. 9 → 18)
 let customHolePars   = [];   // per-hole par for custom/Others courses (null = not set)
+let customSSS        = null; // Standard Scratch Score for custom courses
+let customSlope      = null; // Slope rating for custom courses
 let hcp = localStorage.getItem('gct_hcp') !== null
   ? parseInt(localStorage.getItem('gct_hcp'), 10)
   : DEFAULT_HCP;
@@ -113,7 +115,9 @@ function saveState() {
   localStorage.setItem('gct_holes',  HOLES);
   localStorage.setItem('gct_course',    selectedCourse);
   localStorage.setItem('gct_hcp',       hcp);
-  localStorage.setItem('gct_custompars', JSON.stringify(customHolePars));
+  localStorage.setItem('gct_custompars',  JSON.stringify(customHolePars));
+  localStorage.setItem('gct_customsss',   customSSS   ?? '');
+  localStorage.setItem('gct_customslope', customSlope ?? '');
 }
 function loadState() {
   const savedRound      = localStorage.getItem('gct_round');
@@ -126,6 +130,10 @@ function loadState() {
   if (savedHoles)      { HOLES = parseInt(savedHoles, 10); selectedHoles = HOLES; }
   if (savedCourse)     selectedCourse = savedCourse;
   if (savedCustomPars) customHolePars = JSON.parse(savedCustomPars);
+  const savedSSS   = localStorage.getItem('gct_customsss');
+  const savedSlope = localStorage.getItem('gct_customslope');
+  if (savedSSS)   customSSS   = savedSSS   ? parseFloat(savedSSS)   : null;
+  if (savedSlope) customSlope = savedSlope ? parseFloat(savedSlope) : null;
 }
 loadState();
 
@@ -558,6 +566,51 @@ function buildNineOpts() {
   nineOpts.style.display = '';
 }
 
+const GITHUB_REPO = 'robert-rjm/Golf-Club-Tracker';
+
+function buildSubmitBtn() {
+  const wrap = document.getElementById('submitCourse');
+  wrap.innerHTML = '';
+  // Only show if custom course with a name and at least some pars set
+  const hasName = selectedCourse && selectedCourse !== 'Others';
+  const hasPars = customHolePars.some(p => p !== null);
+  if (!hasName || !hasPars) { wrap.style.display = 'none'; return; }
+
+  const totalPar = customHolePars.reduce((s, p) => s + (p || 0), 0);
+  const holesSnippet = customHolePars
+    .map((p, i) => `      { par: ${p ?? '?'}, si: null }`)
+    .join(',\n');
+  const body =
+`### New course suggestion
+
+**Course name:** ${selectedCourse}
+**Holes:** ${customHolePars.length}
+**Total par:** ${totalPar}
+**SSS:** ${customSSS ?? 'unknown'}
+**Slope:** ${customSlope ?? 'unknown'}
+
+\`\`\`js
+'${selectedCourse}': {
+  par: ${totalPar}, sss: ${customSSS ?? null}, slope: ${customSlope ?? null},
+  holes: [
+${holesSnippet}
+  ]
+}
+\`\`\``;
+
+  const url = `https://github.com/${GITHUB_REPO}/issues/new?`
+    + `title=${encodeURIComponent(`Course suggestion: ${selectedCourse}`)}`
+    + `&body=${encodeURIComponent(body)}`;
+
+  const btn = document.createElement('button');
+  btn.className = 'lobby-opt';
+  btn.style.cssText = 'font-size:13px;opacity:0.7';
+  btn.textContent = '⬆ Suggest this course for the app';
+  btn.addEventListener('click', () => window.open(url, '_blank', 'noopener,noreferrer'));
+  wrap.appendChild(btn);
+  wrap.style.display = '';
+}
+
 function buildParPrompt(n) {
   const prompt = document.getElementById('parPrompt');
   const grid   = document.getElementById('parGrid');
@@ -604,13 +657,46 @@ function buildParGrid(n) {
         btns.querySelectorAll('.par-val-btn').forEach(b => b.classList.remove('sel'));
         btn.classList.add('sel');
         saveState();
+        buildSubmitBtn();
       });
       btns.appendChild(btn);
     });
     row.appendChild(btns);
     inner.appendChild(row);
   });
+  // SSS + Slope inputs
+  const ratingWrap = document.createElement('div');
+  ratingWrap.style.cssText = 'display:flex;gap:10px;margin-top:14px';
+  [
+    { label: 'SSS',   key: 'customSSS',   val: customSSS,   step: '0.1', placeholder: 'e.g. 70.2' },
+    { label: 'Slope', key: 'customSlope', val: customSlope, step: '1',   placeholder: 'e.g. 113'  }
+  ].forEach(({ label, key, val, step, placeholder }) => {
+    const field = document.createElement('div');
+    field.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:5px';
+    const lbl = document.createElement('div');
+    lbl.className = 'lobby-label';
+    lbl.style.fontSize = '12px';
+    lbl.textContent = label + ' (optional)';
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.step = step; inp.placeholder = placeholder;
+    inp.className = 'lobby-custom-input';
+    inp.style.padding = '10px 12px';
+    if (val !== null) inp.value = val;
+    inp.addEventListener('input', () => {
+      const v = inp.value ? parseFloat(inp.value) : null;
+      if (key === 'customSSS')   customSSS   = v;
+      if (key === 'customSlope') customSlope = v;
+      saveState();
+      buildSubmitBtn();
+    });
+    field.appendChild(lbl);
+    field.appendChild(inp);
+    ratingWrap.appendChild(field);
+  });
+  inner.parentElement.appendChild(ratingWrap);
+
   grid.style.display = '';
+  buildSubmitBtn();
 }
 
 function isCustomCourse(course) {
@@ -632,6 +718,7 @@ function buildHoleOpts(course) {
   startOpts.style.display = 'none';
   parPrompt.style.display = 'none';
   parGrid.style.display = 'none';
+  document.getElementById('submitCourse').style.display = 'none';
   holesOpts.innerHTML = '';
   options.forEach(n => {
     const btn = document.createElement('button');
@@ -673,7 +760,15 @@ function buildHoleOpts(course) {
   if (selectedHoles > 0) {
     if (selectedHoles === 9 && nineIsDerived(course)) buildNineOpts();
     if (selectedHoles === 18 && hasFullRound(course)) buildStartOpts();
-    if (isCustomCourse(course)) buildParPrompt(selectedHoles);
+    if (isCustomCourse(course)) {
+      // If pars already saved, skip prompt and show grid + submit button directly
+      if (customHolePars.some(p => p !== null)) {
+        buildParGrid(selectedHoles);
+        buildSubmitBtn();
+      } else {
+        buildParPrompt(selectedHoles);
+      }
+    }
   }
 }
 
@@ -688,6 +783,8 @@ function openLobby() {
     btn.addEventListener('click', () => {
       selectedCourse = name;
       customHolePars = [];
+      customSSS      = null;
+      customSlope    = null;
       selectedStart  = null;
       saveState();
       courseOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
