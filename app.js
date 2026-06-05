@@ -110,6 +110,15 @@ let hcp = localStorage.getItem('gct_hcp') !== null
   ? parseInt(localStorage.getItem('gct_hcp'), 10)
   : DEFAULT_HCP;
 
+// ── MULTIPLAYER STATE ──
+let players = [
+  { name: 'You', hcp: hcp, mode: 'detailed' }
+];
+
+function getSimplePlayers() {
+  return players.filter(p => p.mode === 'simple');
+}
+
 // ── LOCALSTORAGE ──
 function saveState() {
   localStorage.setItem('gct_round',  JSON.stringify(round));
@@ -245,6 +254,63 @@ function buildClubButtons() {
   });
   penaltyGroup.appendChild(penaltyBtn);
   area.appendChild(penaltyGroup);
+
+  // ── Partner score steppers ──
+  const simplePlayers = getSimplePlayers();
+  if (simplePlayers.length > 0) {
+    const partnerGroup = document.createElement('div');
+    partnerGroup.className = 'group';
+    partnerGroup.innerHTML = `<div class="group-title">Playing Partners</div>`;
+
+    const partnerList = document.createElement('div');
+    partnerList.className = 'partner-list';
+    partnerList.id = 'partnerList';
+
+    simplePlayers.forEach((player, pIdx) => {
+      const row = document.createElement('div');
+      row.className = 'partner-row';
+      row.dataset.pidx = pIdx;
+      row.innerHTML = `
+        <div class="partner-name">${player.name} <span class="partner-hcp">(${player.hcp})</span></div>
+        <div class="partner-stepper">
+          <button class="putter-step-btn partner-minus" data-pidx="${pIdx}">−</button>
+          <div class="partner-count-wrap">
+            <div class="partner-count" id="partnerCount-${pIdx}">—</div>
+            <div class="partner-label">shots</div>
+          </div>
+          <button class="putter-step-btn partner-plus" data-pidx="${pIdx}">+</button>
+        </div>
+        <div class="partner-sf" id="partnerSF-${pIdx}"></div>
+      `;
+      partnerList.appendChild(row);
+    });
+
+    partnerGroup.appendChild(partnerList);
+    area.appendChild(partnerGroup);
+
+    // Event listeners
+    partnerList.querySelectorAll('.partner-plus').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = getSimplePlayers()[btn.dataset.pidx];
+        const current = p.round[hole - 1];
+        p.round[hole - 1] = (current || 0) + 1;
+        saveState();
+        renderPartnerScores();
+      });
+    });
+
+    partnerList.querySelectorAll('.partner-minus').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = getSimplePlayers()[btn.dataset.pidx];
+        const current = p.round[hole - 1];
+        if (current && current > 0) {
+          p.round[hole - 1] = current - 1 || null;
+          saveState();
+          renderPartnerScores();
+        }
+      });
+    });
+  }
 }
 
 // ── PUTTER HELPERS ──
@@ -296,7 +362,43 @@ function render() {
     } else {
       parEl.textContent = '';
     }
+    renderPartnerScores();
   }
+
+function renderPartnerScores() {
+  const cd = getCourseData();
+  getSimplePlayers().forEach((player, pIdx) => {
+    const countEl = document.getElementById(`partnerCount-${pIdx}`);
+    const sfEl = document.getElementById(`partnerSF-${pIdx}`);
+    if (!countEl) return;
+
+    const gross = player.round[hole - 1];
+    countEl.textContent = gross || '—';
+
+    // Stableford for this player
+    if (sfEl && cd && gross) {
+      const ph = calcPlayingHCP(cd, HOLES);
+      // Recalc with player's own HCP
+      const playerPH = calcPlayerPlayingHCP(player.hcp, cd, HOLES);
+      const pts = stablefordPoints(hole - 1, gross, playerPH, cd);
+      sfEl.textContent = pts !== null ? `${pts} pts` : '';
+      sfEl.className = 'partner-sf' + (pts >= 2 ? ' good' : pts === 0 ? ' bad' : '');
+    } else if (sfEl) {
+      sfEl.textContent = '';
+    }
+
+    // Disable minus at 0/null
+    const minusBtn = document.querySelector(`.partner-minus[data-pidx="${pIdx}"]`);
+    if (minusBtn) minusBtn.disabled = !gross || gross <= 0;
+  });
+}
+
+// HCP calc for any player (not just the main one)
+function calcPlayerPlayingHCP(playerHcp, course, totalHoles) {
+  if (course.slope == null || course.sss == null) return Math.round(playerHcp * totalHoles / 18);
+  const ch = Math.round(playerHcp * (course.slope / 113) + (course.sss - course.par));
+  return Math.round(ch * totalHoles / 18);
+}
 
   // Lock settings gear once round is started
   document.getElementById('settingsBtn').classList.toggle('locked', roundStarted());
@@ -452,6 +554,37 @@ document.getElementById('sumBtn').addEventListener('click', () => {
        <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`;
 
   document.getElementById('ovStats').innerHTML = statsBoxes;
+
+  if (getSimplePlayers().length > 0) {
+    const cd = getCourseData();
+    const leaderboard = players.map(p => {
+      let totalSF = 0;
+      const isDetailed = p.mode === 'detailed';
+      const ph = calcPlayerPlayingHCP(isDetailed ? hcp : p.hcp, cd, HOLES);
+
+      for (let i = 0; i < HOLES; i++) {
+        const gross = isDetailed ? round[i].length : p.round[i];
+        if (gross) {
+          const pts = stablefordPoints(i, gross, ph, cd);
+          if (pts !== null) totalSF += pts;
+        }
+      }
+      return { name: p.name, sf: totalSF, hcp: isDetailed ? hcp : p.hcp };
+    }).sort((a, b) => b.sf - a.sf);
+
+    const lbHtml = leaderboard.map((p, i) =>
+      `<div class="lb-row${i === 0 ? ' winner' : ''}">
+        <span class="lb-pos">${i === 0 ? '🏆' : i + 1 + '.'}</span>
+        <span class="lb-name">${p.name}</span>
+        <span class="lb-sf">${p.sf} pts</span>
+        <span class="lb-hcp">HCP ${p.hcp}</span>
+      </div>`
+    ).join('');
+
+    document.getElementById('ovStats').insertAdjacentHTML('afterend',
+      `<div class="leaderboard"><div class="lobby-label" style="margin-bottom:8px">🏆 Leaderboard</div>${lbHtml}</div>`
+    );
+  }
 
   var titleEl = document.querySelector('#summaryOverlay .ov-title');
   if (titleEl) titleEl.textContent = selectedCourse || 'Round Summary';
@@ -775,6 +908,55 @@ function buildHoleOpts(course) {
   }
 }
 
+function buildPlayerLobby() {
+  const wrap = document.getElementById('playersLobby');
+  wrap.innerHTML = '<div class="lobby-label">Playing Partners (optional)</div>';
+
+  getSimplePlayers().forEach((p, i) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin:6px 0';
+    row.innerHTML = `
+      <input class="lobby-custom-input" style="flex:2;padding:10px" value="${p.name}" placeholder="Name" data-pidx="${i}" data-field="name">
+      <input class="lobby-custom-input" style="flex:1;padding:10px" type="number" value="${p.hcp}" placeholder="HCP" data-pidx="${i}" data-field="hcp">
+      <button class="pill-x" style="font-size:18px" data-pidx="${i}">✕</button>
+    `;
+    wrap.appendChild(row);
+  });
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'lobby-opt';
+  addBtn.textContent = '+ Add player';
+  addBtn.addEventListener('click', () => {
+    players.push({
+      name: `Player ${players.length}`,
+      hcp: 36,
+      mode: 'simple',
+      round: Array(HOLES || 18).fill(null)
+    });
+    buildPlayerLobby();
+  });
+  wrap.appendChild(addBtn);
+
+  // Bind inputs
+  wrap.querySelectorAll('input[data-field]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const p = getSimplePlayers()[inp.dataset.pidx];
+      if (inp.dataset.field === 'name') p.name = inp.value;
+      if (inp.dataset.field === 'hcp') p.hcp = Math.min(54, Math.max(0, parseInt(inp.value) || 0));
+    });
+  });
+
+  // Bind remove
+  wrap.querySelectorAll('.pill-x[data-pidx]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const simpleIdx = parseInt(btn.dataset.pidx);
+      const globalIdx = players.indexOf(getSimplePlayers()[simpleIdx]);
+      players.splice(globalIdx, 1);
+      buildPlayerLobby();
+    });
+  });
+}
+
 function openLobby() {
   // Rebuild course buttons
   const courseOpts = document.getElementById('courseOpts');
@@ -832,6 +1014,8 @@ function openLobby() {
     const v = parseInt(hcpInput.value, 10);
     hcp = isNaN(v) ? 33 : Math.min(54, Math.max(0, v));
   };
+
+  buildPlayerLobby();
 
   updateLobbyStartBtn();
   showOverlay('lobbyOverlay');
@@ -933,7 +1117,7 @@ document.getElementById('settingsClose').addEventListener('click', closeSettings
 document.getElementById('startRoundBtn').addEventListener('click', closeSettings);
 
 // Return to lobby if pressing on logo during a round
-document.getElementById('logo').addEventListener('click', () => {
+document.querySelector('.logo').addEventListener('click', () => {
   if (roundStarted()) {
     if (!confirm('Leave round? Progress will be lost.')) return;
   }

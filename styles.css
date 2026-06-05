@@ -222,6 +222,55 @@
     text-transform: uppercase; color: rgba(201,168,76,0.5);
   }
 
+  /* ── PLAYER OPTIONS ── */
+  .partner-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .partner-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+  }
+  .partner-name {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+  }
+  .partner-hcp {
+    opacity: 0.5;
+    font-size: 12px;
+  }
+  .partner-stepper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .partner-count-wrap {
+    text-align: center;
+    min-width: 36px;
+  }
+  .partner-count {
+    font-size: 22px;
+    font-weight: 700;
+  }
+  .partner-label {
+    font-size: 10px;
+    opacity: 0.5;
+  }
+  .partner-sf {
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 40px;
+    text-align: right;
+  }
+  .partner-sf.good { color: #4ecb71; }
+  .partner-sf.bad  { color: #e07060; }
+
   /* ── BOTTOM BAR ── */
   .bottom-bar {
     padding: 10px 18px calc(20px + env(safe-area-inset-bottom));
