@@ -46,4 +46,6 @@ Directly from the app, select **Others**: enter your course name, set the hole c
 3. Include: course name, number of holes, total par, SSS, slope, and par/SI for each hole
 
 ## License
-This project is licensed under the MIT License, please see the [LICENSE](LICENSE) file for details.
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
+This project is licensed under CC BY-NC-SA 4.0. See [LICENSE](LICENSE) for details.
