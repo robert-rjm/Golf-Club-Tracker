@@ -60,6 +60,7 @@ function courseBaseName(courseData) {
 
 // WHS course handicap → adjusted for number of holes played
 function calcPlayingHCP(course, totalHoles) {
+  if (course.slope == null || course.sss == null) return Math.round(hcp * totalHoles / 18);
   const ch = Math.round(hcp * (course.slope / 113) + (course.sss - course.par));
   return Math.round(ch * totalHoles / 18);
 }
@@ -67,8 +68,9 @@ function calcPlayingHCP(course, totalHoles) {
 // How many extra strokes a player receives on a given hole (0-based index)
 function strokesOnHole(holeIdx, playingHcp, course) {
   const si   = course.holes[holeIdx].si;
-  const base = Math.floor(playingHcp / 18);
-  const rem  = playingHcp % 18;
+  const base = Math.floor(playingHcp / numHoles);
+  const rem  = playingHcp % numHoles;
+  if (si == null) return base;
   return base + (si <= rem ? 1 : 0);
 }
 
@@ -928,6 +930,14 @@ document.getElementById('settingsBtn').addEventListener('click', () => {
 });
 document.getElementById('settingsClose').addEventListener('click', closeSettings);
 document.getElementById('startRoundBtn').addEventListener('click', closeSettings);
+
+// Return to lobby if pressing on logo during a round
+document.getElementById('logo').addEventListener('click', () => {
+  if (roundStarted()) {
+    if (!confirm('Leave round? Progress will be lost.')) return;
+  }
+  openLobby();
+});
 
 // ── INIT ──
 if (roundStarted()) {
