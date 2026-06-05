@@ -26,7 +26,7 @@ const COURSES = {
     ]
   },
   'Golfclub St Genis - 5 Hole': {
-    par: 17, sss: null, slope: null,
+    par: 16, sss: null, slope: null,
     holes: [
       { par: 3, si: null },
       { par: 3, si: null },
