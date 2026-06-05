@@ -68,8 +68,8 @@ function calcPlayingHCP(course, totalHoles) {
 // How many extra strokes a player receives on a given hole (0-based index)
 function strokesOnHole(holeIdx, playingHcp, course) {
   const si   = course.holes[holeIdx].si;
-  const base = Math.floor(playingHcp / 18);
-  const rem  = playingHcp % 18;
+  const base = Math.floor(playingHcp / numHoles);
+  const rem  = playingHcp % numHoles;
   if (si == null) return base;
   return base + (si <= rem ? 1 : 0);
 }
