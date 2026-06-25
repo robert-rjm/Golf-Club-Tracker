@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="static/img/logo.png" alt="Black(Out)Jack Logo" height="200">
+  <img src="Logo.png" alt="Golf Club Tracker Logo" height="200">
 </p>
 
 <h1 align="center">Golf Club Tracker</h1>
