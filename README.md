@@ -1,8 +1,15 @@
-# Golf Club Tracker ⛳
+<p align="center">
+  <img src="static/img/logo.png" alt="Black(Out)Jack Logo" height="200">
+</p>
 
-A mobile web app companion for tracking which clubs you hit on every shot during a round of golf. Easy tap and track to review your round later.
+<h1 align="center">Golf Club Tracker</h1>
+<p align="center"><i>A mobile web app companion for tracking which clubs you hit on every shot during a round of golf. Easy tap and track to review your round later.</i></p>
 
-**[Try it live →](https://robert-rjm.github.io/Golf-Club-Tracker/)**
+<p align="center">
+  <a href="https://robert-rjm.github.io/Golf-Club-Tracker/">
+    <img src="https://img.shields.io/badge/▶%20TRY%20IT%20LIVE-2ea44f?style=for-the-badge&labelColor=1a1a1a" alt="Try It Live" height="30">
+  </a>
+</p>
 
 ---
 
