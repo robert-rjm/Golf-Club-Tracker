@@ -84,6 +84,26 @@ function stablefordPoints(holeIdx, grossShots, playingHcp, course) {
   return Math.max(0, 2 + par + strokes - grossShots);
 }
 
+// WHS "Net Double Bogey" cap for a hole (max score countable for handicap purposes)
+function adjustedGrossForHole(holeIdx, grossShots, playingHcp, course) {
+  if (!grossShots) return null;
+  const par = course.holes[holeIdx].par;
+  if (par === null) return null;
+  const strokes = strokesOnHole(holeIdx, playingHcp, course);
+  return Math.min(grossShots, par + 2 + strokes);
+}
+
+// WHS Score Differential: (113 / Slope Rating) × (Adjusted Gross Score − Course Rating − PCC)
+// PCC (Playing Conditions Calculation) isn't computed here — it needs field-wide scoring
+// data this app doesn't track, so it's treated as 0. For rounds shorter than 18 holes the
+// result is scaled to an 18-hole equivalent, matching how playing handicap is already
+// scaled elsewhere in this app for partial rounds.
+function scoreDifferential(course, holesCounted, adjustedGrossTotal) {
+  if (!course || course.slope == null || course.sss == null || !holesCounted) return null;
+  const diff = (113 / course.slope) * (adjustedGrossTotal - course.sss);
+  return diff * 18 / holesCounted;
+}
+
 // ── DEFAULTS (first visit only) ──
 const DEFAULT_BAG = ['D', '3W', '5W', '5H', '5i', '6i', '7i', '8i', '9i', 'PW', 'SW'];
 const DEFAULT_HCP = 54;
@@ -516,7 +536,7 @@ document.getElementById('sumBtn').addEventListener('click', () => {
   const ph = cd ? calcPlayingHCP(cd, HOLES) : 0;
 
   const body = document.getElementById('ovBody');
-  let totalSF = 0; let sfHoles = 0;
+  let totalSF = 0; let sfHoles = 0; let adjGrossTotal = 0;
   body.innerHTML = round.map((shots, i) => {
     const pills = shots.length
       ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
@@ -525,7 +545,10 @@ document.getElementById('sumBtn').addEventListener('click', () => {
     let sfCol = '';
     if (cd && i < cd.holes.length) {
       const pts = stablefordPoints(i, shots.length, ph, cd);
-      if (pts !== null) { totalSF += pts; sfHoles++; }
+      if (pts !== null) {
+        totalSF += pts; sfHoles++;
+        adjGrossTotal += adjustedGrossForHole(i, shots.length, ph, cd);
+      }
       const parLabel = cd.holes[i].par !== null ? 'Par ' + cd.holes[i].par : '';
       sfCol = `<div class="sum-sf">
         <div class="sum-sf-pts">${pts !== null ? pts : '—'}</div>
@@ -558,11 +581,17 @@ document.getElementById('sumBtn').addEventListener('click', () => {
     topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
   }
 
+  const diff = cd ? scoreDifferential(cd, sfHoles, adjGrossTotal) : null;
+  const diffBox = diff !== null
+    ? `<div class="stat-box"><div class="stat-val">${diff.toFixed(1)}</div><div class="stat-lbl">Played to (WHS)</div></div>`
+    : '';
+
   const statsBoxes = cd
     ? `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
        <div class="stat-box"><div class="stat-val">${sfHoles > 0 ? totalSF : '—'}</div><div class="stat-lbl">Stableford</div></div>
        <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
-       <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`
+       <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>
+       ${diffBox}`
     : `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
        <div class="stat-box"><div class="stat-val">${hcp > 0 ? total - Math.round(hcp * HOLES / 18) : '—'}</div><div class="stat-lbl">Net Score</div></div>
        <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
