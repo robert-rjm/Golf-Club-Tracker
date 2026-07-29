@@ -84,6 +84,26 @@ function stablefordPoints(holeIdx, grossShots, playingHcp, course) {
   return Math.max(0, 2 + par + strokes - grossShots);
 }
 
+// WHS "Net Double Bogey" cap for a hole (max score countable for handicap purposes)
+function adjustedGrossForHole(holeIdx, grossShots, playingHcp, course) {
+  if (!grossShots) return null;
+  const par = course.holes[holeIdx].par;
+  if (par === null) return null;
+  const strokes = strokesOnHole(holeIdx, playingHcp, course);
+  return Math.min(grossShots, par + 2 + strokes);
+}
+
+// WHS Score Differential: (113 / Slope Rating) × (Adjusted Gross Score − Course Rating − PCC)
+// PCC (Playing Conditions Calculation) isn't computed here — it needs field-wide scoring
+// data this app doesn't track, so it's treated as 0. For rounds shorter than 18 holes the
+// result is scaled to an 18-hole equivalent, matching how playing handicap is already
+// scaled elsewhere in this app for partial rounds.
+function scoreDifferential(course, holesCounted, adjustedGrossTotal) {
+  if (!course || course.slope == null || course.sss == null || !holesCounted) return null;
+  const diff = (113 / course.slope) * (adjustedGrossTotal - course.sss);
+  return diff * 18 / holesCounted;
+}
+
 // ── DEFAULTS (first visit only) ──
 const DEFAULT_BAG = ['D', '3W', '5W', '5H', '5i', '6i', '7i', '8i', '9i', 'PW', 'SW'];
 const DEFAULT_HCP = 54;
@@ -125,23 +145,38 @@ function saveState() {
   localStorage.setItem('gct_hole',   hole);
   localStorage.setItem('gct_bag',    JSON.stringify(activeBag));
   localStorage.setItem('gct_holes',  HOLES);
+  localStorage.setItem('gct_selectedholes', selectedHoles);
+  localStorage.setItem('gct_secondround',   secondRound ? '1' : '');
+  localStorage.setItem('gct_selectednine',  selectedNine ?? '');
+  localStorage.setItem('gct_selectedstart', selectedStart ?? '');
   localStorage.setItem('gct_course',    selectedCourse);
   localStorage.setItem('gct_hcp',       hcp);
   localStorage.setItem('gct_custompars',  JSON.stringify(customHolePars));
   localStorage.setItem('gct_customsss',   customSSS   ?? '');
   localStorage.setItem('gct_customslope', customSlope ?? '');
+  localStorage.setItem('gct_players', JSON.stringify(players));
 }
 function loadState() {
   const savedRound      = localStorage.getItem('gct_round');
   const savedHole       = localStorage.getItem('gct_hole');
   const savedHoles      = localStorage.getItem('gct_holes');
+  const savedSelHoles   = localStorage.getItem('gct_selectedholes');
+  const savedSecondRound = localStorage.getItem('gct_secondround');
+  const savedNine       = localStorage.getItem('gct_selectednine');
+  const savedStart      = localStorage.getItem('gct_selectedstart');
   const savedCourse     = localStorage.getItem('gct_course');
   const savedCustomPars = localStorage.getItem('gct_custompars');
+  const savedPlayers    = localStorage.getItem('gct_players');
   if (savedRound)      round          = JSON.parse(savedRound);
   if (savedHole)       hole           = parseInt(savedHole, 10);
-  if (savedHoles)      { HOLES = parseInt(savedHoles, 10); selectedHoles = HOLES; }
+  if (savedHoles)      HOLES          = parseInt(savedHoles, 10);
+  selectedHoles  = savedSelHoles ? parseInt(savedSelHoles, 10) : HOLES;
+  secondRound    = savedSecondRound === '1';
+  selectedNine   = savedNine  || null;
+  selectedStart  = savedStart || null;
   if (savedCourse)     selectedCourse = savedCourse;
   if (savedCustomPars) customHolePars = JSON.parse(savedCustomPars);
+  if (savedPlayers)    players        = JSON.parse(savedPlayers);
   const savedSSS   = localStorage.getItem('gct_customsss');
   const savedSlope = localStorage.getItem('gct_customslope');
   if (savedSSS)   customSSS   = savedSSS   ? parseFloat(savedSSS)   : null;
@@ -501,7 +536,7 @@ document.getElementById('sumBtn').addEventListener('click', () => {
   const ph = cd ? calcPlayingHCP(cd, HOLES) : 0;
 
   const body = document.getElementById('ovBody');
-  let totalSF = 0; let sfHoles = 0;
+  let totalSF = 0; let sfHoles = 0; let adjGrossTotal = 0;
   body.innerHTML = round.map((shots, i) => {
     const pills = shots.length
       ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
@@ -510,7 +545,10 @@ document.getElementById('sumBtn').addEventListener('click', () => {
     let sfCol = '';
     if (cd && i < cd.holes.length) {
       const pts = stablefordPoints(i, shots.length, ph, cd);
-      if (pts !== null) { totalSF += pts; sfHoles++; }
+      if (pts !== null) {
+        totalSF += pts; sfHoles++;
+        adjGrossTotal += adjustedGrossForHole(i, shots.length, ph, cd);
+      }
       const parLabel = cd.holes[i].par !== null ? 'Par ' + cd.holes[i].par : '';
       sfCol = `<div class="sum-sf">
         <div class="sum-sf-pts">${pts !== null ? pts : '—'}</div>
@@ -543,11 +581,17 @@ document.getElementById('sumBtn').addEventListener('click', () => {
     topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
   }
 
+  const diff = cd ? scoreDifferential(cd, sfHoles, adjGrossTotal) : null;
+  const diffBox = diff !== null
+    ? `<div class="stat-box"><div class="stat-val">${diff.toFixed(1)}</div><div class="stat-lbl">Played to (WHS)</div></div>`
+    : '';
+
   const statsBoxes = cd
     ? `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
        <div class="stat-box"><div class="stat-val">${sfHoles > 0 ? totalSF : '—'}</div><div class="stat-lbl">Stableford</div></div>
        <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
-       <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`
+       <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>
+       ${diffBox}`
     : `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
        <div class="stat-box"><div class="stat-val">${hcp > 0 ? total - Math.round(hcp * HOLES / 18) : '—'}</div><div class="stat-lbl">Net Score</div></div>
        <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
@@ -933,6 +977,7 @@ function buildPlayerLobby() {
       mode: 'simple',
       round: Array(HOLES || 18).fill(null)
     });
+    saveState();
     buildPlayerLobby();
   });
   wrap.appendChild(addBtn);
@@ -943,6 +988,7 @@ function buildPlayerLobby() {
       const p = getSimplePlayers()[inp.dataset.pidx];
       if (inp.dataset.field === 'name') p.name = inp.value;
       if (inp.dataset.field === 'hcp') p.hcp = Math.min(54, Math.max(0, parseInt(inp.value) || 0));
+      saveState();
     });
   });
 
@@ -952,6 +998,7 @@ function buildPlayerLobby() {
       const simpleIdx = parseInt(btn.dataset.pidx);
       const globalIdx = players.indexOf(getSimplePlayers()[simpleIdx]);
       players.splice(globalIdx, 1);
+      saveState();
       buildPlayerLobby();
     });
   });
