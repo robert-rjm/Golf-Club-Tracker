@@ -125,23 +125,38 @@ function saveState() {
   localStorage.setItem('gct_hole',   hole);
   localStorage.setItem('gct_bag',    JSON.stringify(activeBag));
   localStorage.setItem('gct_holes',  HOLES);
+  localStorage.setItem('gct_selectedholes', selectedHoles);
+  localStorage.setItem('gct_secondround',   secondRound ? '1' : '');
+  localStorage.setItem('gct_selectednine',  selectedNine ?? '');
+  localStorage.setItem('gct_selectedstart', selectedStart ?? '');
   localStorage.setItem('gct_course',    selectedCourse);
   localStorage.setItem('gct_hcp',       hcp);
   localStorage.setItem('gct_custompars',  JSON.stringify(customHolePars));
   localStorage.setItem('gct_customsss',   customSSS   ?? '');
   localStorage.setItem('gct_customslope', customSlope ?? '');
+  localStorage.setItem('gct_players', JSON.stringify(players));
 }
 function loadState() {
   const savedRound      = localStorage.getItem('gct_round');
   const savedHole       = localStorage.getItem('gct_hole');
   const savedHoles      = localStorage.getItem('gct_holes');
+  const savedSelHoles   = localStorage.getItem('gct_selectedholes');
+  const savedSecondRound = localStorage.getItem('gct_secondround');
+  const savedNine       = localStorage.getItem('gct_selectednine');
+  const savedStart      = localStorage.getItem('gct_selectedstart');
   const savedCourse     = localStorage.getItem('gct_course');
   const savedCustomPars = localStorage.getItem('gct_custompars');
+  const savedPlayers    = localStorage.getItem('gct_players');
   if (savedRound)      round          = JSON.parse(savedRound);
   if (savedHole)       hole           = parseInt(savedHole, 10);
-  if (savedHoles)      { HOLES = parseInt(savedHoles, 10); selectedHoles = HOLES; }
+  if (savedHoles)      HOLES          = parseInt(savedHoles, 10);
+  selectedHoles  = savedSelHoles ? parseInt(savedSelHoles, 10) : HOLES;
+  secondRound    = savedSecondRound === '1';
+  selectedNine   = savedNine  || null;
+  selectedStart  = savedStart || null;
   if (savedCourse)     selectedCourse = savedCourse;
   if (savedCustomPars) customHolePars = JSON.parse(savedCustomPars);
+  if (savedPlayers)    players        = JSON.parse(savedPlayers);
   const savedSSS   = localStorage.getItem('gct_customsss');
   const savedSlope = localStorage.getItem('gct_customslope');
   if (savedSSS)   customSSS   = savedSSS   ? parseFloat(savedSSS)   : null;
@@ -933,6 +948,7 @@ function buildPlayerLobby() {
       mode: 'simple',
       round: Array(HOLES || 18).fill(null)
     });
+    saveState();
     buildPlayerLobby();
   });
   wrap.appendChild(addBtn);
@@ -943,6 +959,7 @@ function buildPlayerLobby() {
       const p = getSimplePlayers()[inp.dataset.pidx];
       if (inp.dataset.field === 'name') p.name = inp.value;
       if (inp.dataset.field === 'hcp') p.hcp = Math.min(54, Math.max(0, parseInt(inp.value) || 0));
+      saveState();
     });
   });
 
@@ -952,6 +969,7 @@ function buildPlayerLobby() {
       const simpleIdx = parseInt(btn.dataset.pidx);
       const globalIdx = players.indexOf(getSimplePlayers()[simpleIdx]);
       players.splice(globalIdx, 1);
+      saveState();
       buildPlayerLobby();
     });
   });
