@@ -1102,6 +1102,7 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   secondRound = false;
   HOLES = selectedHoles;
   round = Array.from({length: HOLES}, () => []);
+  getSimplePlayers().forEach(p => { p.round = Array(HOLES).fill(null); });
   hole  = 1;
   hideOverlay('lobbyOverlay');
   document.getElementById('settingsBtn').classList.remove('locked');
