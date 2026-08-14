@@ -104,7 +104,10 @@ function adjustedGrossForHole(holeIdx, grossShots, playingHcp, course) {
 // scaled elsewhere in this app for partial rounds.
 function scoreDifferential(course, holesCounted, adjustedGrossTotal) {
   if (!course || course.slope == null || course.sss == null || !holesCounted) return null;
-  const diff = (113 / course.slope) * (adjustedGrossTotal - course.sss);
+  // course.sss is always an 18-hole-equivalent rating (same assumption calcPlayingHCP
+  // makes) — scale it down to the holes actually played before comparing.
+  const sss  = course.sss * holesCounted / 18;
+  const diff = (113 / course.slope) * (adjustedGrossTotal - sss);
   return diff * 18 / holesCounted;
 }
 
