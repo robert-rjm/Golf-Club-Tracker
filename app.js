@@ -31,7 +31,11 @@ function getCourseData() {
     );
     if (full) {
       const holes = selectedNine === 'front' ? full.holes.slice(0, 9) : full.holes.slice(9, 18);
-      return withSecondRound({ ...full, holes, par: holes.reduce((s, h) => s + h.par, 0) });
+      // Keep full.par/sss/slope (18-hole rating) intact — calcPlayingHCP already
+      // scales the resulting course handicap down by totalHoles/18 for partial
+      // rounds. Overriding par with the 9-hole subset here would mismatch it
+      // against the still-18-hole sss/slope and badly inflate the handicap calc.
+      return withSecondRound({ ...full, holes });
     }
   }
   // Custom/Others course — build synthetic data from customHolePars (default par 4)
@@ -100,7 +104,10 @@ function adjustedGrossForHole(holeIdx, grossShots, playingHcp, course) {
 // scaled elsewhere in this app for partial rounds.
 function scoreDifferential(course, holesCounted, adjustedGrossTotal) {
   if (!course || course.slope == null || course.sss == null || !holesCounted) return null;
-  const diff = (113 / course.slope) * (adjustedGrossTotal - course.sss);
+  // course.sss is always an 18-hole-equivalent rating (same assumption calcPlayingHCP
+  // makes) — scale it down to the holes actually played before comparing.
+  const sss  = course.sss * holesCounted / 18;
+  const diff = (113 / course.slope) * (adjustedGrossTotal - sss);
   return diff * 18 / holesCounted;
 }
 
