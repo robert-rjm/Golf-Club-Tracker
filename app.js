@@ -377,6 +377,40 @@ function updatePutterUI(animate) {
   if (minusBtn) minusBtn.disabled = n === 0;
 }
 
+// HCP calc for any player (not just the main one)
+function calcPlayerPlayingHCP(playerHcp, course, totalHoles) {
+  if (course.slope == null || course.sss == null) return Math.round(playerHcp * totalHoles / 18);
+  const ch = Math.round(playerHcp * (course.slope / 113) + (course.sss - course.par));
+  return Math.round(ch * totalHoles / 18);
+}
+
+function renderPartnerScores() {
+  const cd = getCourseData();
+  getSimplePlayers().forEach((player, pIdx) => {
+    const countEl = document.getElementById(`partnerCount-${pIdx}`);
+    const sfEl = document.getElementById(`partnerSF-${pIdx}`);
+    if (!countEl) return;
+
+    const gross = player.round[hole - 1];
+    countEl.textContent = gross || '—';
+
+    // Stableford for this player
+    if (sfEl && cd && gross) {
+      // Recalc with player's own HCP
+      const playerPH = calcPlayerPlayingHCP(player.hcp, cd, HOLES);
+      const pts = stablefordPoints(hole - 1, gross, playerPH, cd);
+      sfEl.textContent = pts !== null ? `${pts} pts` : '';
+      sfEl.className = 'partner-sf' + (pts >= 2 ? ' good' : pts === 0 ? ' bad' : '');
+    } else if (sfEl) {
+      sfEl.textContent = '';
+    }
+
+    // Disable minus at 0/null
+    const minusBtn = document.querySelector(`.partner-minus[data-pidx="${pIdx}"]`);
+    if (minusBtn) minusBtn.disabled = !gross || gross <= 0;
+  });
+}
+
 // ── RENDER ──
 function render() {
   document.getElementById('hNum').textContent = hole;
@@ -406,41 +440,6 @@ function render() {
     }
     renderPartnerScores();
   }
-
-function renderPartnerScores() {
-  const cd = getCourseData();
-  getSimplePlayers().forEach((player, pIdx) => {
-    const countEl = document.getElementById(`partnerCount-${pIdx}`);
-    const sfEl = document.getElementById(`partnerSF-${pIdx}`);
-    if (!countEl) return;
-
-    const gross = player.round[hole - 1];
-    countEl.textContent = gross || '—';
-
-    // Stableford for this player
-    if (sfEl && cd && gross) {
-      const ph = calcPlayingHCP(cd, HOLES);
-      // Recalc with player's own HCP
-      const playerPH = calcPlayerPlayingHCP(player.hcp, cd, HOLES);
-      const pts = stablefordPoints(hole - 1, gross, playerPH, cd);
-      sfEl.textContent = pts !== null ? `${pts} pts` : '';
-      sfEl.className = 'partner-sf' + (pts >= 2 ? ' good' : pts === 0 ? ' bad' : '');
-    } else if (sfEl) {
-      sfEl.textContent = '';
-    }
-
-    // Disable minus at 0/null
-    const minusBtn = document.querySelector(`.partner-minus[data-pidx="${pIdx}"]`);
-    if (minusBtn) minusBtn.disabled = !gross || gross <= 0;
-  });
-}
-
-// HCP calc for any player (not just the main one)
-function calcPlayerPlayingHCP(playerHcp, course, totalHoles) {
-  if (course.slope == null || course.sss == null) return Math.round(playerHcp * totalHoles / 18);
-  const ch = Math.round(playerHcp * (course.slope / 113) + (course.sss - course.par));
-  return Math.round(ch * totalHoles / 18);
-}
 
   // Lock settings gear once round is started
   document.getElementById('settingsBtn').classList.toggle('locked', roundStarted());
@@ -538,23 +537,37 @@ function hideOverlay(id) {
 }
 
 // ── SUMMARY ──
-document.getElementById('sumBtn').addEventListener('click', () => {
-  const cd = getCourseData();
-  const ph = cd ? calcPlayingHCP(cd, HOLES) : 0;
+const PLAYER_COLORS = ['#c9a84c', '#5fb0c9', '#e0973c', '#8fbf5f', '#d1637a', '#8a7fd6'];
+let summaryPlayerIdx = 0;
 
-  const body = document.getElementById('ovBody');
-  let totalSF = 0; let sfHoles = 0; let adjGrossTotal = 0;
-  body.innerHTML = round.map((shots, i) => {
-    const pills = shots.length
-      ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
-      : '<span class="sum-none">No shots</span>';
+// Builds the hole-by-hole log + stat boxes for one player (main or partner)
+function renderSummaryFor(playerIdx) {
+  const cd = getCourseData();
+  const player = players[playerIdx];
+  const isDetailed = player.mode === 'detailed';
+  const ph = cd ? calcPlayerPlayingHCP(isDetailed ? hcp : player.hcp, cd, HOLES) : 0;
+
+  let totalSF = 0, sfHoles = 0, adjGrossTotal = 0, total = 0, holesPlayed = 0;
+
+  document.getElementById('ovBody').innerHTML = Array.from({ length: HOLES }, (_, i) => {
+    const shots = isDetailed ? round[i] : null;
+    const grossCount = isDetailed ? shots.length : (player.round[i] || 0);
+    if (grossCount) { total += grossCount; holesPlayed++; }
+
+    const pills = isDetailed
+      ? (shots.length
+          ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
+          : '<span class="sum-none">No shots</span>')
+      : (grossCount
+          ? `<span class="sum-pill">${grossCount} shot${grossCount === 1 ? '' : 's'}</span>`
+          : '<span class="sum-none">No shots</span>');
 
     let sfCol = '';
     if (cd && i < cd.holes.length) {
-      const pts = stablefordPoints(i, shots.length, ph, cd);
+      const pts = stablefordPoints(i, grossCount, ph, cd);
       if (pts !== null) {
         totalSF += pts; sfHoles++;
-        adjGrossTotal += adjustedGrossForHole(i, shots.length, ph, cd);
+        adjGrossTotal += adjustedGrossForHole(i, grossCount, ph, cd);
       }
       const parLabel = cd.holes[i].par !== null ? 'Par ' + cd.holes[i].par : '';
       sfCol = `<div class="sum-sf">
@@ -566,26 +579,26 @@ document.getElementById('sumBtn').addEventListener('click', () => {
     return `<div class="sum-row">
       <div class="sum-left">
         <div class="sum-hnum">${i+1}</div>
-        <div class="sum-shots-count">${shots.length ? shots.length + 'sh' : ''}</div>
+        <div class="sum-shots-count">${grossCount ? grossCount + 'sh' : ''}</div>
       </div>
       <div class="sum-pills">${pills}</div>
       ${sfCol}
     </div>`;
   }).join('');
 
-  const total = round.reduce((a, s) => a + s.length, 0);
-  const holesPlayed = round.filter(s => s.length > 0).length;
-
-  const freq = {};
-  round.forEach(shots => shots.forEach(c => {
-    if (c !== 'Putter') freq[c] = (freq[c]||0)+1;
-  }));
-  const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]);
-  let topLabel = '—';
-  if (sorted.length) {
-    const topCount = sorted[0][1];
-    const tied = sorted.filter(function(e){ return e[1] === topCount; }).map(function(e){ return e[0]; });
-    topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
+  // "Most Used" club is only meaningful for the main player — partners aren't tracked per-club
+  let mostUsedBox = '';
+  if (isDetailed) {
+    const freq = {};
+    round.forEach(shots => shots.forEach(c => { if (c !== 'Putter') freq[c] = (freq[c]||0)+1; }));
+    const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]);
+    let topLabel = '—';
+    if (sorted.length) {
+      const topCount = sorted[0][1];
+      const tied = sorted.filter(e => e[1] === topCount).map(e => e[0]);
+      topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
+    }
+    mostUsedBox = `<div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`;
   }
 
   const diff = cd ? scoreDifferential(cd, sfHoles, adjGrossTotal) : null;
@@ -597,18 +610,48 @@ document.getElementById('sumBtn').addEventListener('click', () => {
     ? `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
        <div class="stat-box"><div class="stat-val">${sfHoles > 0 ? totalSF : '—'}</div><div class="stat-lbl">Stableford</div></div>
        <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
-       <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>
+       ${mostUsedBox}
        ${diffBox}`
     : `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
-       <div class="stat-box"><div class="stat-val">${hcp > 0 ? total - Math.round(hcp * HOLES / 18) : '—'}</div><div class="stat-lbl">Net Score</div></div>
+       <div class="stat-box"><div class="stat-val">${isDetailed && hcp > 0 ? total - Math.round(hcp * HOLES / 18) : '—'}</div><div class="stat-lbl">Net Score</div></div>
        <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
-       <div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`;
+       ${mostUsedBox}`;
 
   document.getElementById('ovStats').innerHTML = statsBoxes;
 
+  const titleEl = document.querySelector('#summaryOverlay .ov-title');
+  if (titleEl) titleEl.textContent = isDetailed ? (selectedCourse || 'Round Summary') : `${player.name}'s Round`;
+}
+
+function buildPlayerSwitch() {
+  const wrap = document.getElementById('ovPlayerSwitch');
+  wrap.innerHTML = '';
+  if (players.length <= 1) return;
+  players.forEach((p, idx) => {
+    const tab = document.createElement('div');
+    tab.className = 'player-tab' + (idx === summaryPlayerIdx ? ' sel' : '');
+    tab.style.setProperty('--player-color', PLAYER_COLORS[idx % PLAYER_COLORS.length]);
+    tab.innerHTML = `<span class="player-tab-dot"></span>${p.name}`;
+    tab.addEventListener('click', () => {
+      summaryPlayerIdx = idx;
+      buildPlayerSwitch();
+      renderSummaryFor(idx);
+    });
+    wrap.appendChild(tab);
+  });
+}
+
+document.getElementById('sumBtn').addEventListener('click', () => {
+  summaryPlayerIdx = 0;
+  buildPlayerSwitch();
+  renderSummaryFor(0);
+
+  const existingLb = document.querySelector('#summaryOverlay .leaderboard');
+  if (existingLb) existingLb.remove();
+
   if (getSimplePlayers().length > 0) {
     const cd = getCourseData();
-    const leaderboard = players.map(p => {
+    const leaderboard = players.map((p, idx) => {
       let totalSF = 0;
       const isDetailed = p.mode === 'detailed';
       const ph = calcPlayerPlayingHCP(isDetailed ? hcp : p.hcp, cd, HOLES);
@@ -620,11 +663,11 @@ document.getElementById('sumBtn').addEventListener('click', () => {
           if (pts !== null) totalSF += pts;
         }
       }
-      return { name: p.name, sf: totalSF, hcp: isDetailed ? hcp : p.hcp };
+      return { idx, name: p.name, sf: totalSF, hcp: isDetailed ? hcp : p.hcp };
     }).sort((a, b) => b.sf - a.sf);
 
     const lbHtml = leaderboard.map((p, i) =>
-      `<div class="lb-row${i === 0 ? ' winner' : ''}">
+      `<div class="lb-row${i === 0 ? ' winner' : ''}" data-pidx="${p.idx}" style="--player-color:${PLAYER_COLORS[p.idx % PLAYER_COLORS.length]}">
         <span class="lb-pos">${i === 0 ? '🏆' : i + 1 + '.'}</span>
         <span class="lb-name">${p.name}</span>
         <span class="lb-sf">${p.sf} pts</span>
@@ -635,10 +678,16 @@ document.getElementById('sumBtn').addEventListener('click', () => {
     document.getElementById('ovStats').insertAdjacentHTML('afterend',
       `<div class="leaderboard"><div class="lobby-label" style="margin-bottom:8px">🏆 Leaderboard</div>${lbHtml}</div>`
     );
+
+    document.querySelectorAll('#summaryOverlay .leaderboard .lb-row').forEach(row => {
+      row.addEventListener('click', () => {
+        summaryPlayerIdx = +row.dataset.pidx;
+        buildPlayerSwitch();
+        renderSummaryFor(summaryPlayerIdx);
+      });
+    });
   }
 
-  var titleEl = document.querySelector('#summaryOverlay .ov-title');
-  if (titleEl) titleEl.textContent = selectedCourse || 'Round Summary';
   showOverlay('summaryOverlay');
 });
 document.getElementById('sumClose').addEventListener('click', function() {
@@ -1102,6 +1151,7 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   secondRound = false;
   HOLES = selectedHoles;
   round = Array.from({length: HOLES}, () => []);
+  getSimplePlayers().forEach(p => { p.round = Array(HOLES).fill(null); });
   hole  = 1;
   hideOverlay('lobbyOverlay');
   document.getElementById('settingsBtn').classList.remove('locked');
