@@ -328,6 +328,32 @@
   }
 
   /* ── SUMMARY ── */
+  .ov-player-switch {
+    display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+    flex-shrink: 0; margin-bottom: 12px;
+  }
+  .ov-player-switch::-webkit-scrollbar { display: none; }
+  .player-tab {
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 20px; padding: 7px 13px;
+    font-family: 'Karla', sans-serif;
+    font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.4);
+    cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  .player-tab-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--player-color, var(--gold));
+    flex-shrink: 0;
+  }
+  .player-tab.sel {
+    background: color-mix(in srgb, var(--player-color, var(--gold)) 18%, transparent);
+    border-color: var(--player-color, var(--gold));
+    color: var(--cream);
+  }
+  .player-tab:active { transform: scale(0.94); }
   .ov-body { flex: 1; overflow-y: auto; scrollbar-width: none; }
   .ov-body::-webkit-scrollbar { display: none; }
   .sum-row {
@@ -360,6 +386,22 @@
   }
   .stat-val { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: var(--gold); line-height: 1; }
   .stat-lbl { font-size: 10px; color: var(--cream-dim); letter-spacing: 1px; margin-top: 2px; }
+
+  .leaderboard { flex-shrink: 0; margin-top: 12px; }
+  .lb-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; margin-bottom: 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--player-color, var(--gold));
+    border-radius: 10px; cursor: pointer; transition: background 0.1s;
+  }
+  .lb-row:active { background: rgba(255,255,255,0.08); }
+  .lb-row.winner { background: rgba(201,168,76,0.1); border-color: var(--gold-bright); }
+  .lb-pos { font-family: 'Bebas Neue', sans-serif; font-size: 16px; color: var(--cream-dim); min-width: 20px; }
+  .lb-name { flex: 1; font-size: 14px; font-weight: 700; }
+  .lb-sf { font-size: 14px; font-weight: 700; color: var(--gold); }
+  .lb-hcp { font-size: 11px; color: var(--cream-dim); min-width: 52px; text-align: right; }
   .copy-btn {
     flex-shrink: 0; margin-top: 12px; width: 100%;
     background: var(--green-mid); border: none; border-radius: 12px;
