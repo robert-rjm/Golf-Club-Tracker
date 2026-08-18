@@ -704,7 +704,26 @@ document.getElementById('copyBtn').addEventListener('click', () => {
   const rows = round.map((shots, i) =>
     `Hole ${i+1} (${shots.length} shots): ${shots.length ? shots.join(' → ') : '—'}`
   ).join('\n');
-  const text = header ? `${header}\n\n${rows}` : rows;
+
+  // Scorecard table (Hole, Par, score per player) appended at the bottom
+  const cd = getCourseData();
+  const cols = ['Hole', 'Par', ...players.map(p => p.name)];
+  const tableLines = [cols.join('\t')];
+  const totals = players.map(() => 0);
+  let parTotal = 0;
+  for (let i = 0; i < HOLES; i++) {
+    const par = cd && i < cd.holes.length && cd.holes[i].par !== null ? cd.holes[i].par : '';
+    if (par !== '') parTotal += par;
+    const scores = players.map((p, pIdx) => {
+      const gross = p.mode === 'detailed' ? round[i].length : p.round[i];
+      if (gross) totals[pIdx] += gross;
+      return gross || '';
+    });
+    tableLines.push([i + 1, par, ...scores].join('\t'));
+  }
+  tableLines.push(['Total', parTotal || '', ...totals.map(t => t || '')].join('\t'));
+
+  const text = (header ? `${header}\n\n${rows}` : rows) + `\n\n${tableLines.join('\n')}`;
   navigator.clipboard.writeText(text).then(() => {
     const b = document.getElementById('copyBtn');
     b.textContent = '✓ Copied to clipboard!';
