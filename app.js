@@ -377,6 +377,40 @@ function updatePutterUI(animate) {
   if (minusBtn) minusBtn.disabled = n === 0;
 }
 
+// HCP calc for any player (not just the main one)
+function calcPlayerPlayingHCP(playerHcp, course, totalHoles) {
+  if (course.slope == null || course.sss == null) return Math.round(playerHcp * totalHoles / 18);
+  const ch = Math.round(playerHcp * (course.slope / 113) + (course.sss - course.par));
+  return Math.round(ch * totalHoles / 18);
+}
+
+function renderPartnerScores() {
+  const cd = getCourseData();
+  getSimplePlayers().forEach((player, pIdx) => {
+    const countEl = document.getElementById(`partnerCount-${pIdx}`);
+    const sfEl = document.getElementById(`partnerSF-${pIdx}`);
+    if (!countEl) return;
+
+    const gross = player.round[hole - 1];
+    countEl.textContent = gross || '—';
+
+    // Stableford for this player
+    if (sfEl && cd && gross) {
+      // Recalc with player's own HCP
+      const playerPH = calcPlayerPlayingHCP(player.hcp, cd, HOLES);
+      const pts = stablefordPoints(hole - 1, gross, playerPH, cd);
+      sfEl.textContent = pts !== null ? `${pts} pts` : '';
+      sfEl.className = 'partner-sf' + (pts >= 2 ? ' good' : pts === 0 ? ' bad' : '');
+    } else if (sfEl) {
+      sfEl.textContent = '';
+    }
+
+    // Disable minus at 0/null
+    const minusBtn = document.querySelector(`.partner-minus[data-pidx="${pIdx}"]`);
+    if (minusBtn) minusBtn.disabled = !gross || gross <= 0;
+  });
+}
+
 // ── RENDER ──
 function render() {
   document.getElementById('hNum').textContent = hole;
@@ -406,41 +440,6 @@ function render() {
     }
     renderPartnerScores();
   }
-
-function renderPartnerScores() {
-  const cd = getCourseData();
-  getSimplePlayers().forEach((player, pIdx) => {
-    const countEl = document.getElementById(`partnerCount-${pIdx}`);
-    const sfEl = document.getElementById(`partnerSF-${pIdx}`);
-    if (!countEl) return;
-
-    const gross = player.round[hole - 1];
-    countEl.textContent = gross || '—';
-
-    // Stableford for this player
-    if (sfEl && cd && gross) {
-      const ph = calcPlayingHCP(cd, HOLES);
-      // Recalc with player's own HCP
-      const playerPH = calcPlayerPlayingHCP(player.hcp, cd, HOLES);
-      const pts = stablefordPoints(hole - 1, gross, playerPH, cd);
-      sfEl.textContent = pts !== null ? `${pts} pts` : '';
-      sfEl.className = 'partner-sf' + (pts >= 2 ? ' good' : pts === 0 ? ' bad' : '');
-    } else if (sfEl) {
-      sfEl.textContent = '';
-    }
-
-    // Disable minus at 0/null
-    const minusBtn = document.querySelector(`.partner-minus[data-pidx="${pIdx}"]`);
-    if (minusBtn) minusBtn.disabled = !gross || gross <= 0;
-  });
-}
-
-// HCP calc for any player (not just the main one)
-function calcPlayerPlayingHCP(playerHcp, course, totalHoles) {
-  if (course.slope == null || course.sss == null) return Math.round(playerHcp * totalHoles / 18);
-  const ch = Math.round(playerHcp * (course.slope / 113) + (course.sss - course.par));
-  return Math.round(ch * totalHoles / 18);
-}
 
   // Lock settings gear once round is started
   document.getElementById('settingsBtn').classList.toggle('locked', roundStarted());
