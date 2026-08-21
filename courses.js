@@ -3,7 +3,8 @@
 
 const COURSES = {
   'Golfclub St Genis': {
-    par: 74, sss: 70.2, slope: 131,
+    // Yellow starting tee
+    par: 74, sss: 68.4, slope: 114,
     holes: [
       { par: 4, si: 1  },
       { par: 5, si: 11 },
