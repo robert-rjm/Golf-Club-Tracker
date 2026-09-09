@@ -64,7 +64,7 @@ const COURSES = {
   'Grandvalira Golf Soldeu': {
     // https://www.grandvalira.com/en/golf-soldeu
     // Yellow starting tee
-    par: 33, sss: null, slope: null,
+    par: 33, sss: 64.4, slope: 110,
     holes: [
       { par: 4, si: 4  },
       { par: 3, si: 6  },
