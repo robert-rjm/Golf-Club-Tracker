@@ -1227,20 +1227,21 @@ function buildTeeOpts() {
   }
   const course = courseEntry();
   if (!colours.includes(selectedTee)) selectedTee = (course && course.defaultTee) || colours[0];
-  colours.forEach(colour => {
-    const btn = document.createElement('button');
-    btn.className = 'lobby-opt' + (selectedTee === colour ? ' sel' : '');
-    btn.textContent = colour;
-    btn.addEventListener('click', () => {
-      selectedTee = colour;
-      wrap.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
-      btn.classList.add('sel');
-      saveState();
-      buildPlayerLobby();   // partner rows show this tee as their "default" option
-      updateLobbyStartBtn();
-    });
-    wrap.appendChild(btn);
+  // A course can carry seven or more tees — far too many to sit as pills in one row
+  const sel = document.createElement('select');
+  sel.className = 'lobby-custom-input';
+  sel.id = 'teeSelect';
+  sel.innerHTML = colours.map(colour =>
+    `<option value="${colour}"${selectedTee === colour ? ' selected' : ''}>${colour}${
+      course && course.defaultTee === colour ? ' (default)' : ''}</option>`
+  ).join('');
+  sel.addEventListener('change', () => {
+    selectedTee = sel.value;
+    saveState();
+    buildPlayerLobby();   // partner rows show this tee as their "default" option
+    updateLobbyStartBtn();
   });
+  wrap.appendChild(sel);
   section.style.display = '';
 }
 
@@ -1592,12 +1593,12 @@ function buildPlayerLobby() {
     if (p.tee && !colours.includes(p.tee)) p.tee = null;
     if (!p.category) p.category = DEFAULT_CATEGORY;
     const teeField = colours.length < 2 ? '' : `
-      <select class="lobby-custom-input" style="flex:1;padding:10px" data-pidx="${i}" data-field="tee">
+      <select class="lobby-custom-input" style="flex:1;padding:10px 30px 10px 10px" data-pidx="${i}" data-field="tee">
         <option value=""${p.tee ? '' : ' selected'}>Tee: ${selectedTee || 'default'}</option>
         ${colours.map(c => `<option value="${c}"${p.tee === c ? ' selected' : ''}>${c}</option>`).join('')}
       </select>`;
     const catField = cats.length < 2 ? '' : `
-      <select class="lobby-custom-input" style="flex:1;padding:10px" data-pidx="${i}" data-field="category">
+      <select class="lobby-custom-input" style="flex:1;padding:10px 30px 10px 10px" data-pidx="${i}" data-field="category">
         ${cats.map(c => `<option value="${c}"${p.category === c ? ' selected' : ''}>${cap(c)}</option>`).join('')}
       </select>`;
     const extras = (teeField || catField)
