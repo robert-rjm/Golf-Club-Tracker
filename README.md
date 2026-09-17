@@ -36,10 +36,10 @@ Course data (par, stroke index, SSS, slope) is stored in `courses.js`. Currently
 
 | Course | Holes | Par | Slope | Stableford |
 |--------|-------|-----|-------|------------|
-| St Genis - 18 Hole | 9 - 18 | 74 | 131 | ✅ |
+| St Genis | 9 - 18 | 37 | 114 | ✅ |
 | St Genis - 5 Hole | 5 | 17 | N/A | ❌ |
 | UGolf Aravella Andorra | 18 | 71 | 129 | ✅ |
-| Grandvalira Golf Soldeu | 9 | 33 | N/A | ❌ |
+| Grandvalira Golf Soldeu | 9 - 18 | 33 | N/A | ❌ |
 | Other | 9 - 18 | selectable | N/A | ❌ |
 
 > Stableford scoring requires SSS and slope to calculate your playing handicap. Courses without these values will still track clubs and shots, just without points.

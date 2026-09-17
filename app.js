@@ -26,7 +26,37 @@ function withStartNine(courseObj) {
   return { ...courseObj, holes };
 }
 
-function getCourseData() {
+// Ratings vary by tee colour and player category, the card does not — so this returns
+// only { sss, slope }. A course with no `tees` list keeps using its top-level ratings.
+// Passing null for either axis takes the course's defaultTee and, within it, the first
+// entry listed. An unrated combination degrades down the chain below to the default tee,
+// so a round never ends up with no ratings at all.
+//
+// A tee entry with no `players` is rated for everyone, which is how most courses outside
+// France publish: one rating per tee, no men/ladies split. Such an entry matches whatever
+// category is asked for, so a colour can mix the two — list the gendered entries and let
+// an unlabelled one catch every other category.
+function ratingFor(course, tee, players) {
+  if (!course.tees || !course.tees.length) return { sss: course.sss, slope: course.slope };
+  const pick = (colour, cat) => course.tees.find(x =>
+    (!colour || x.colour === colour) && (!cat || !x.players || x.players === cat));
+  const colour = tee || course.defaultTee;
+  const t = pick(colour, players)              // the tee and category asked for
+         || pick(colour, null)                 // that tee, whichever category it lists
+         || pick(course.defaultTee, players)   // unknown tee — fall back to the default
+         || pick(course.defaultTee, null)
+         || course.tees[0];
+  return { sss: t.sss, slope: t.slope };
+}
+
+// Resolves the hole list for the round, then layers the selected tee's ratings on top.
+function getCourseData(player) {
+  const course = buildCourseData();
+  return course ? { ...course, ...ratingFor(course, selectedTee, player && player.category) }
+                : course;
+}
+
+function buildCourseData() {
   // Check for an explicit entry first
   const explicit = Object.values(COURSES).find(c =>
     courseBaseName(c) === selectedCourse && c.holes.length === selectedHoles
@@ -164,6 +194,7 @@ let selectedHoles    = 0;   // 0 = not yet chosen
 let selectedNine     = null; // 'front' | 'back' | null — only used when 9 holes derived from 18
 let secondNine       = null; // 'front' | 'back' | null — the nine played in an added second round
 let selectedStart    = null; // 'front' | 'back' | null — which 9 to start on for a full 18
+let selectedTee      = null; // tee colour for the round; null uses the course's defaultTee
 let secondRound      = false; // play the selected holes twice (e.g. 9 → 18)
 let lobbySecondRound = false; // lobby picked 18 on a 9-hole course — play its nine twice
 let customHolePars   = [];   // per-hole par for custom/Others courses (null = not set)
