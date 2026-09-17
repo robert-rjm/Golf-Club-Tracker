@@ -86,7 +86,6 @@
     transition: all 0.1s; flex-shrink: 0;
   }
   .settings-btn:active { background: rgba(201,168,76,0.2); color: var(--gold); transform: scale(0.86); }
-  .settings-btn.locked { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
 
   /* ── HOLE STRIP ── */
   .strip-wrap {
@@ -221,6 +220,17 @@
     font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
     text-transform: uppercase; color: rgba(201,168,76,0.5);
   }
+  /* Compact variant for the score-only breakdown rows */
+  .putter-step-btn.step-sm {
+    flex: 0 0 38px; height: 38px;
+    font-size: 22px; border-radius: 10px;
+  }
+  /* The par a score-only hole sits on before anything is logged */
+  .putter-count.pending { color: rgba(201,168,76,0.3); }
+  .score-hint {
+    font-size: 11px; color: rgba(255,255,255,0.28);
+    text-align: center; font-style: italic;
+  }
 
   /* ── PLAYER OPTIONS ── */
   .partner-list {
@@ -258,6 +268,9 @@
     font-size: 22px;
     font-weight: 700;
   }
+  .partner-count.bump { animation: bump 0.18s ease; }
+  /* The par a partner's hole sits on before anything is entered */
+  .partner-count.pending { opacity: 0.3; cursor: pointer; }
   .partner-label {
     font-size: 10px;
     opacity: 0.5;
@@ -512,6 +525,24 @@
     font-family: 'Karla', sans-serif;
     font-size: 15px; font-weight: 600;
     padding: 13px 14px; width: 100%; outline: none;
+  }
+  /* A native dropdown paints its popup list with the field's own background. Ours is
+     near-transparent, so the list came out cream-on-white and unreadable — the options
+     need an explicit opaque fill of their own. The caret is drawn here because
+     appearance:none removes the platform one. */
+  select.lobby-custom-input {
+    appearance: none; -webkit-appearance: none; cursor: pointer;
+    background-color: rgba(255,255,255,0.05);
+    background-image: linear-gradient(45deg,  transparent 50%, var(--cream-dim) 50%),
+                      linear-gradient(135deg, var(--cream-dim) 50%, transparent 50%);
+    background-position: calc(100% - 19px) 50%, calc(100% - 14px) 50%;
+    background-size: 6px 6px, 6px 6px;
+    background-repeat: no-repeat;
+    padding-right: 34px;
+  }
+  select.lobby-custom-input option {
+    background: var(--dark);
+    color: var(--cream);
   }
   .lobby-custom-input:focus { border-color: rgba(201,168,76,0.45); }
   .lobby-custom-input::placeholder { color: rgba(255,255,255,0.25); }
