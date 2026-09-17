@@ -5,6 +5,9 @@ const ALL_CLUBS = {
   'Wedges':         ['PW', 'PA', 'GW', 'AW', 'SW', 'LW']
 };
 
+// Logged alongside clubs but not clubs, so they never count towards "Most Used"
+const NOT_A_CLUB = ['Putter', 'Penalty'];
+
 function withSecondRound(courseObj) {
   if (!secondRound) return courseObj;
   // Only the hole list doubles. par/ratingPar/sss/slope stay at the course's rating
@@ -49,11 +52,14 @@ function ratingFor(course, tee, players) {
   return { sss: t.sss, slope: t.slope };
 }
 
-// Resolves the hole list for the round, then layers the selected tee's ratings on top.
+// Resolves the hole list for the round, then layers on the ratings for the tee this
+// player is off and the category they are rated under. `selectedTee` is the lobby's
+// choice — yours, and the default for any partner who has not picked their own.
 function getCourseData(player) {
   const course = buildCourseData();
-  return course ? { ...course, ...ratingFor(course, selectedTee, player && player.category) }
-                : course;
+  if (!course) return course;
+  const tee = (player && player.tee) || selectedTee;
+  return { ...course, ...ratingFor(course, tee, player && player.category) };
 }
 
 function buildCourseData() {
@@ -178,6 +184,7 @@ function scoreDifferential(course, holesCounted, adjustedGrossTotal) {
 // ── DEFAULTS (first visit only) ──
 const DEFAULT_BAG = ['D', '3W', '5W', '5H', '5i', '6i', '7i', '8i', '9i', 'PW', 'SW'];
 const DEFAULT_HCP = 54;
+const DEFAULT_CATEGORY = 'men';
 
 let activeBag = localStorage.getItem('gct_bag')
   ? JSON.parse(localStorage.getItem('gct_bag'))
@@ -205,8 +212,10 @@ let hcp = localStorage.getItem('gct_hcp') !== null
   : DEFAULT_HCP;
 
 // ── MULTIPLAYER STATE ──
+// The detailed player carries no `hcp`: scoring reads the global `hcp` for them
+// (`isDetailed ? hcp : p.hcp`), so a copy here would only drift. Partners have their own.
 let players = [
-  { name: 'You', hcp: hcp, mode: 'detailed' }
+  { name: 'You', mode: 'detailed', category: DEFAULT_CATEGORY }
 ];
 
 function getSimplePlayers() {
@@ -224,6 +233,7 @@ function saveState() {
   localStorage.setItem('gct_selectednine',  selectedNine ?? '');
   localStorage.setItem('gct_secondnine',    secondNine ?? '');
   localStorage.setItem('gct_selectedstart', selectedStart ?? '');
+  localStorage.setItem('gct_selectedtee',   selectedTee ?? '');
   localStorage.setItem('gct_course',    selectedCourse);
   localStorage.setItem('gct_hcp',       hcp);
   localStorage.setItem('gct_custompars',  JSON.stringify(customHolePars));
@@ -240,20 +250,29 @@ function loadState() {
   const savedNine       = localStorage.getItem('gct_selectednine');
   const savedSecondNine = localStorage.getItem('gct_secondnine');
   const savedStart      = localStorage.getItem('gct_selectedstart');
+  const savedTee        = localStorage.getItem('gct_selectedtee');
   const savedCourse     = localStorage.getItem('gct_course');
   const savedCustomPars = localStorage.getItem('gct_custompars');
   const savedPlayers    = localStorage.getItem('gct_players');
   if (savedRound)      round          = JSON.parse(savedRound);
   if (savedHole)       hole           = parseInt(savedHole, 10);
   if (savedHoles)      HOLES          = parseInt(savedHoles, 10);
-  selectedHoles  = savedSelHoles ? parseInt(savedSelHoles, 10) : HOLES;
+  // 0 rather than HOLES, so a first run shows nothing selected instead of a phantom 18
+  selectedHoles  = savedSelHoles ? parseInt(savedSelHoles, 10) : 0;
   secondRound    = savedSecondRound === '1';
   selectedNine   = savedNine  || null;
   secondNine     = savedSecondNine || null;
   selectedStart  = savedStart || null;
+  selectedTee    = savedTee   || null;
   if (savedCourse)     selectedCourse = savedCourse;
   if (savedCustomPars) customHolePars = JSON.parse(savedCustomPars);
   if (savedPlayers)    players        = JSON.parse(savedPlayers);
+  players.forEach(p => {
+    // Drop the stale copy older versions stored on the detailed player
+    if (p.mode === 'detailed') delete p.hcp;
+    // Players saved before categories existed default in rather than staying unrated
+    if (!p.category) p.category = DEFAULT_CATEGORY;
+  });
   const savedSSS   = localStorage.getItem('gct_customsss');
   const savedSlope = localStorage.getItem('gct_customslope');
   if (savedSSS)   customSSS   = savedSSS   ? parseFloat(savedSSS)   : null;
@@ -448,8 +467,9 @@ function updatePutterUI(animate) {
 }
 
 function renderPartnerScores() {
-  const cd = getCourseData();
   getSimplePlayers().forEach((player, pIdx) => {
+    // Same tee, but each player is rated under their own category
+    const cd = getCourseData(player);
     const countEl = document.getElementById(`partnerCount-${pIdx}`);
     const sfEl = document.getElementById(`partnerSF-${pIdx}`);
     if (!countEl) return;
@@ -492,7 +512,7 @@ function render() {
   // Par + stroke allowance label for current hole
   const parEl = document.getElementById('holePar');
   if (parEl) {
-    const cd = getCourseData();
+    const cd = getCourseData(mainPlayer());
     if (cd && hole <= cd.holes.length) {
       const ph = calcPlayingHCP(hcp, cd, HOLES);
       const s  = strokesOnHole(hole - 1, ph, cd);
@@ -608,8 +628,8 @@ let summaryPlayerIdx = 0;
 
 // Builds the hole-by-hole log + stat boxes for one player (main or partner)
 function renderSummaryFor(playerIdx) {
-  const cd = getCourseData();
   const player = players[playerIdx];
+  const cd = getCourseData(player);
   const isDetailed = player.mode === 'detailed';
   const ph = cd ? calcPlayingHCP(isDetailed ? hcp : player.hcp, cd, HOLES) : 0;
 
@@ -656,7 +676,9 @@ function renderSummaryFor(playerIdx) {
   let mostUsedBox = '';
   if (isDetailed) {
     const freq = {};
-    round.forEach(shots => shots.forEach(c => { if (c !== 'Putter') freq[c] = (freq[c]||0)+1; }));
+    round.forEach(shots => shots.forEach(c => {
+      if (!NOT_A_CLUB.includes(c)) freq[c] = (freq[c] || 0) + 1;
+    }));
     const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]);
     let topLabel = '—';
     if (sorted.length) {
@@ -716,9 +738,9 @@ document.getElementById('sumBtn').addEventListener('click', () => {
   if (existingLb) existingLb.remove();
 
   if (getSimplePlayers().length > 0) {
-    const cd = getCourseData();
     const leaderboard = players.map((p, idx) => {
       let totalSF = 0;
+      const cd = getCourseData(p);
       const isDetailed = p.mode === 'detailed';
       const ph = calcPlayingHCP(isDetailed ? hcp : p.hcp, cd, HOLES);
 
@@ -771,7 +793,8 @@ document.getElementById('copyBtn').addEventListener('click', () => {
     `Hole ${i+1} (${shots.length} shots): ${shots.length ? shots.join(' → ') : '—'}`
   ).join('\n');
 
-  // Scorecard table (Hole, Par, score per player) appended at the bottom
+  // Scorecard table (Hole, Par, score per player) appended at the bottom. No player is
+  // passed because this only reads hole pars, which are shared across tees and categories.
   const cd = getCourseData();
   const cols = ['Hole', 'Par', ...players.map(p => p.name)];
   const tableLines = [cols.join('\t')];
@@ -869,6 +892,80 @@ function hasFullRound(course) {
   return Object.keys(COURSES).some(k =>
     k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course && COURSES[k].holes.length === 18
   );
+}
+
+// The tee colours and player categories below come from the entry actually in play, so
+// they follow the hole count: St Genis lists seven colours for its nine, but the 5-hole
+// compact entry lists only its own. Both are empty for a course with no `tees`.
+function teeColoursFor() {
+  const c = buildCourseData();
+  return c && c.tees ? [...new Set(c.tees.map(t => t.colour))] : [];
+}
+
+function categoriesFor() {
+  const c = buildCourseData();
+  return c && c.tees ? [...new Set(c.tees.filter(t => t.players).map(t => t.players))] : [];
+}
+
+// The single detailed player — 'You'. Everyone else is a simple-mode partner.
+function mainPlayer() {
+  return players.find(p => p.mode === 'detailed') || players[0];
+}
+
+// Only worth showing when there is a choice to make: one tee, or none listed, needs no
+// picker, and the resolver falls back to the course's defaultTee anyway.
+function buildTeeOpts() {
+  const wrap    = document.getElementById('teeOpts');
+  const section = document.getElementById('teeSection');
+  const colours = teeColoursFor();
+  wrap.innerHTML = '';
+  if (colours.length < 2) {
+    // Drop a tee left over from another course or hole count
+    if (!colours.includes(selectedTee)) selectedTee = null;
+    section.style.display = 'none';
+    return;
+  }
+  const course = buildCourseData();
+  if (!colours.includes(selectedTee)) selectedTee = course.defaultTee || colours[0];
+  colours.forEach(colour => {
+    const btn = document.createElement('button');
+    btn.className = 'lobby-opt' + (selectedTee === colour ? ' sel' : '');
+    btn.textContent = colour;
+    btn.addEventListener('click', () => {
+      selectedTee = colour;
+      wrap.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
+      btn.classList.add('sel');
+      saveState();
+      buildPlayerLobby();   // partner rows show this tee as their "default" option
+      updateLobbyStartBtn();
+    });
+    wrap.appendChild(btn);
+  });
+  section.style.display = '';
+}
+
+// Category for the detailed player. Left unset by default — the app should not assume
+// one — in which case ratingFor takes the tee's first listed entry.
+function buildCategoryOpts() {
+  const wrap = document.getElementById('categoryOpts');
+  const row  = document.getElementById('categoryRow');
+  const cats = categoriesFor();
+  wrap.innerHTML = '';
+  if (cats.length < 2) { row.style.display = 'none'; return; }
+  const me = mainPlayer();
+  cats.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'lobby-opt' + (me.category === cat ? ' sel' : '');
+    btn.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+    btn.addEventListener('click', () => {
+      me.category = cat;
+      saveState();
+      buildCategoryOpts();
+      updateLobbyStartBtn();
+    });
+    wrap.appendChild(btn);
+  });
+  row.style.display = '';
 }
 
 function buildStartOpts() {
@@ -1108,6 +1205,8 @@ function buildHoleOpts(course) {
         parGrid.style.display = 'none';
         parGrid.innerHTML = '';
       }
+      buildTeeOpts();
+      buildCategoryOpts();
       updateLobbyStartBtn();
     });
     holesOpts.appendChild(btn);
@@ -1126,19 +1225,41 @@ function buildHoleOpts(course) {
       }
     }
   }
+  buildTeeOpts();
+  buildCategoryOpts();
+  buildPlayerLobby();
 }
 
 function buildPlayerLobby() {
   const wrap = document.getElementById('playersLobby');
   wrap.innerHTML = '<div class="lobby-label">Playing Partners (optional)</div>';
 
+  const cats    = categoriesFor();
+  const colours = teeColoursFor();
+  const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
   getSimplePlayers().forEach((p, i) => {
+    // A tee left over from another course or hole count is no longer selectable
+    if (p.tee && !colours.includes(p.tee)) p.tee = null;
+    if (!p.category) p.category = DEFAULT_CATEGORY;
+    const teeField = colours.length < 2 ? '' : `
+      <select class="lobby-custom-input" style="flex:1;padding:10px" data-pidx="${i}" data-field="tee">
+        <option value=""${p.tee ? '' : ' selected'}>Tee: ${selectedTee || 'default'}</option>
+        ${colours.map(c => `<option value="${c}"${p.tee === c ? ' selected' : ''}>${c}</option>`).join('')}
+      </select>`;
+    const catField = cats.length < 2 ? '' : `
+      <select class="lobby-custom-input" style="flex:1;padding:10px" data-pidx="${i}" data-field="category">
+        ${cats.map(c => `<option value="${c}"${p.category === c ? ' selected' : ''}>${cap(c)}</option>`).join('')}
+      </select>`;
+    const extras = (teeField || catField)
+      ? `<div style="display:flex;gap:8px;margin-top:6px">${teeField}${catField}</div>` : '';
     const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:8px;align-items:center;margin:6px 0';
+    row.style.cssText = 'margin:10px 0';
     row.innerHTML = `
-      <input class="lobby-custom-input" style="flex:2;padding:10px" value="${p.name}" placeholder="Name" data-pidx="${i}" data-field="name">
-      <input class="lobby-custom-input" style="flex:1;padding:10px" type="number" value="${p.hcp}" placeholder="HCP" data-pidx="${i}" data-field="hcp">
-      <button class="pill-x" style="font-size:18px" data-pidx="${i}">✕</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input class="lobby-custom-input" style="flex:2;padding:10px" value="${p.name}" placeholder="Name" data-pidx="${i}" data-field="name">
+        <input class="lobby-custom-input" style="flex:1;padding:10px" type="number" value="${p.hcp}" placeholder="HCP" data-pidx="${i}" data-field="hcp">
+        <button class="pill-x" style="font-size:18px" data-pidx="${i}">✕</button>
+      </div>${extras}
     `;
     wrap.appendChild(row);
   });
@@ -1151,6 +1272,8 @@ function buildPlayerLobby() {
       name: `Player ${players.length}`,
       hcp: 36,
       mode: 'simple',
+      tee: null,
+      category: DEFAULT_CATEGORY,
       round: Array(HOLES || 18).fill(null)
     });
     saveState();
@@ -1158,12 +1281,14 @@ function buildPlayerLobby() {
   });
   wrap.appendChild(addBtn);
 
-  // Bind inputs
-  wrap.querySelectorAll('input[data-field]').forEach(inp => {
-    inp.addEventListener('input', () => {
+  // Bind inputs — the category picker is a <select>, so match on the attribute not the tag
+  wrap.querySelectorAll('[data-field]').forEach(inp => {
+    inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', () => {
       const p = getSimplePlayers()[inp.dataset.pidx];
-      if (inp.dataset.field === 'name') p.name = inp.value;
-      if (inp.dataset.field === 'hcp') p.hcp = Math.min(54, Math.max(0, parseInt(inp.value) || 0));
+      if (inp.dataset.field === 'name')     p.name = inp.value;
+      if (inp.dataset.field === 'hcp')      p.hcp = Math.min(54, Math.max(0, parseInt(inp.value) || 0));
+      if (inp.dataset.field === 'category') p.category = inp.value || DEFAULT_CATEGORY;
+      if (inp.dataset.field === 'tee')      p.tee = inp.value || null;
       saveState();
     });
   });
@@ -1237,7 +1362,9 @@ function openLobby() {
   hcpInput.value = hcp;
   hcpInput.oninput = () => {
     const v = parseInt(hcpInput.value, 10);
-    hcp = isNaN(v) ? 33 : Math.min(54, Math.max(0, v));
+    // Blank box falls back to the maximum, not to anyone's actual handicap — a real one
+    // is only ever remembered from what was entered last time, via gct_hcp.
+    hcp = isNaN(v) ? DEFAULT_HCP : Math.min(54, Math.max(0, v));
   };
 
   buildPlayerLobby();
@@ -1256,8 +1383,9 @@ function updateLobbyStartBtn() {
   btn.disabled = !ready;
   const nineLabel  = selectedNine  ? ` (${selectedNine} 9)`             : '';
   const startLabel = selectedStart ? ` from hole ${selectedStart === 'front' ? '1' : '10'}` : '';
+  const teeLabel   = selectedTee   ? ` · ${selectedTee} tee` : '';
   btn.textContent = ready
-    ? `Tee off → ${lobbyHoleChoice()} holes at ${selectedCourse}${nineLabel}${startLabel}`
+    ? `Tee off → ${lobbyHoleChoice()} holes at ${selectedCourse}${nineLabel}${startLabel}${teeLabel}`
     : needsNine && !selectedNine
       ? 'Select front or back 9 →'
       : needsStart && !selectedStart
@@ -1269,7 +1397,7 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   if (!selectedCourse || !selectedHoles) return;
   const hcpInput = document.getElementById('hcpInput');
   const v = parseInt(hcpInput.value, 10);
-  hcp = isNaN(v) ? 33 : Math.min(54, Math.max(0, v));
+  hcp = isNaN(v) ? DEFAULT_HCP : Math.min(54, Math.max(0, v));
   // A doubled nine starts already in its second round, exactly as if the nine had been
   // played and "add another nine" pressed at the turn.
   secondRound = lobbySecondRound;

@@ -80,9 +80,17 @@
       <div id="parGrid" style="display:none;margin-top:10px"></div>
       <div id="submitCourse" style="display:none;margin-top:10px"></div>
     </div>
+    <div class="lobby-section" id="teeSection" style="display:none">
+      <div class="lobby-label">Tee</div>
+      <div class="lobby-opts" id="teeOpts"></div>
+    </div>
     <div class="lobby-section">
       <div class="lobby-label">Handicap (HCP)</div>
-      <input type="number" class="lobby-custom-input" id="hcpInput" min="0" max="54" placeholder="33">
+      <input type="number" class="lobby-custom-input" id="hcpInput" min="0" max="54" placeholder="54">
+      <div id="categoryRow" style="display:none;margin-top:8px">
+        <div class="lobby-label" style="font-size:12px">Rated as</div>
+        <div class="lobby-opts" id="categoryOpts"></div>
+      </div>
     </div>
     <div class="lobby-section" id="playersLobby"></div>
   </div>

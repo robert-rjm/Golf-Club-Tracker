@@ -59,7 +59,7 @@ const COURSES = {
   },
   'Ugolf Aravella Andorra': {
     // https://aravellgolfclub.com/el-camp
-    par: 71, sss: 68.7, slope: 129,
+    par: 71, ratingPar: 71,
     defaultTee: 'Yellow',
     tees: [
       { colour: 'Black',  sss: 72.7, slope: 140 },
