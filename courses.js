@@ -1,15 +1,12 @@
 // Golf course data
-// Add new courses here — each entry needs: par, sss, slope, and holes array (par + si per hole)
-//
-// sss and slope are always 18-hole-equivalent ratings, even for a 9-hole course. For a
-// 9-hole entry that means `par` (the sum of its nine holes) is NOT the par those ratings
-// were measured against, so add `ratingPar` with the 18-hole figure — the course handicap
-// formula uses ratingPar, everything else uses par.
+// Add new courses here with each entry needing: par, sss, slope, and holes array (par + si per hole)
+// For 9-hole courses, add ratingPar with the 18-hole par those ratings were measured against.
+// sss and slope are always 18-hole-equivalent ratings, even for a 9-hole course.
 
 const COURSES = {
   'Golfclub St Genis': {
-    // Yellow starting tee. 9-hole course: par 37 over its nine holes, but sss 68.4 is an
-    // 18-hole-equivalent rating, so it is rated against an 18-hole par of 74.
+    // https://pages.ffgolf.org/tools/calculette?glfcod=0614&tercod=01&k=9d9be33fd9ad795bf40f665d8fd813e2
+    // Yellow tee
     par: 37, ratingPar: 74, sss: 68.4, slope: 114,
     holes: [
       { par: 4, si: 1 },
@@ -25,7 +22,8 @@ const COURSES = {
   },
   'Golfclub St Genis - 5 Hole': {
     // https://pages.ffgolf.org/tools/calculette?glfcod=0614&tercod=02&k=2462ec1091a0ecfd6403abd1e520cc34
-    par: 16, sss: 26.2, slope: 45,
+    // Compact tee
+    par: 16, ratingPar: 58, sss: 52.4, slope: 90,
     holes: [
       { par: 3, si: 1 },
       { par: 3, si: 2 },
@@ -36,7 +34,7 @@ const COURSES = {
   },
   'Ugolf Aravella Andorra': {
     // https://aravellgolfclub.com/el-camp
-    // Yellow starting tee
+    // Yellow tee
     par: 71, sss: 68.7, slope: 129,
     holes: [
       { par: 4, si: 2  },
@@ -61,8 +59,7 @@ const COURSES = {
   },
   'Grandvalira Golf Soldeu': {
     // https://www.grandvalira.com/en/golf-soldeu
-    // Yellow starting tee. 9-hole course: par 33 over its nine holes, but sss 64.4 is an
-    // 18-hole-equivalent rating, so it is rated against an 18-hole par of 66.
+    // Yellow tee
     par: 33, ratingPar: 66, sss: 64.4, slope: 110,
     holes: [
       { par: 4, si: 4  },
