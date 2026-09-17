@@ -1,5 +1,10 @@
 // Golf course data
 // Add new courses here — each entry needs: par, sss, slope, and holes array (par + si per hole)
+//
+// sss and slope are always 18-hole-equivalent ratings, even for a 9-hole course. For a
+// 9-hole entry that means `par` (the sum of its nine holes) is NOT the par those ratings
+// were measured against, so add `ratingPar` with the 18-hole figure — the course handicap
+// formula uses ratingPar, everything else uses par.
 
 const COURSES = {
   'Golfclub St Genis': {
@@ -63,8 +68,9 @@ const COURSES = {
   },
   'Grandvalira Golf Soldeu': {
     // https://www.grandvalira.com/en/golf-soldeu
-    // Yellow starting tee
-    par: 33, sss: 64.4, slope: 110,
+    // Yellow starting tee. 9-hole course: par 33 over its nine holes, but sss 64.4 is an
+    // 18-hole-equivalent rating, so it is rated against an 18-hole par of 66.
+    par: 33, ratingPar: 66, sss: 64.4, slope: 110,
     holes: [
       { par: 4, si: 4  },
       { par: 3, si: 6  },

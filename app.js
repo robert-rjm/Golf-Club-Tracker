@@ -7,8 +7,16 @@ const ALL_CLUBS = {
 
 function withSecondRound(courseObj) {
   if (!secondRound) return courseObj;
-  const holes = [...courseObj.holes, ...courseObj.holes];
-  return { ...courseObj, holes, par: holes.reduce((s, h) => s + h.par, 0) };
+  // Only the hole list doubles. par/ratingPar/sss/slope stay at the course's rating
+  // values — calcPlayingHCP scales the resulting course handicap up by totalHoles/18,
+  // so doubling the par here too would mismatch it against the un-doubled rating and
+  // swing the handicap wildly negative.
+  return { ...courseObj, holes: [...courseObj.holes, ...courseObj.holes] };
+}
+
+// The front or back nine of an 18-hole course entry
+function nineSlice(courseObj, side) {
+  return side === 'back' ? courseObj.holes.slice(9, 18) : courseObj.holes.slice(0, 9);
 }
 
 // Rotate an 18-hole course to start on back 9 when selectedStart === 'back'
@@ -30,12 +38,16 @@ function getCourseData() {
       courseBaseName(c) === selectedCourse && c.holes.length === 18
     );
     if (full) {
-      const holes = selectedNine === 'front' ? full.holes.slice(0, 9) : full.holes.slice(9, 18);
-      // Keep full.par/sss/slope (18-hole rating) intact — calcPlayingHCP already
-      // scales the resulting course handicap down by totalHoles/18 for partial
-      // rounds. Overriding par with the 9-hole subset here would mismatch it
-      // against the still-18-hole sss/slope and badly inflate the handicap calc.
-      return withSecondRound({ ...full, holes });
+      // A second round may be played on the other nine, so build the hole list from
+      // both selections rather than repeating selectedNine twice.
+      const holes = secondRound
+        ? [...nineSlice(full, selectedNine), ...nineSlice(full, secondNine || selectedNine)]
+        : nineSlice(full, selectedNine);
+      // Keep full.par/ratingPar/sss/slope (18-hole rating) intact — calcPlayingHCP
+      // already scales the resulting course handicap down by totalHoles/18 for
+      // partial rounds. Overriding par with the 9-hole subset here would mismatch
+      // it against the still-18-hole sss/slope and badly inflate the handicap calc.
+      return { ...full, holes };
     }
   }
   // Custom/Others course — build synthetic data from customHolePars (default par 4)
@@ -44,9 +56,11 @@ function getCourseData() {
       par: customHolePars[i] || null, si: null
     }));
     const holes = secondRound ? [...baseHoles, ...baseHoles] : baseHoles;
-    const knownPars = holes.filter(h => h.par !== null);
-    const totalPar = knownPars.length ? knownPars.reduce((s, h) => s + h.par, 0) : null;
-    return { par: totalPar, sss: customSSS, slope: customSlope, holes };
+    const knownPars = baseHoles.filter(h => h.par !== null);
+    const basePar = knownPars.length ? knownPars.reduce((s, h) => s + h.par, 0) : null;
+    // customSSS is entered as an 18-hole rating, so ratingPar has to be 18-hole too.
+    const ratingPar = basePar !== null ? basePar * 18 / selectedHoles : null;
+    return { par: basePar, ratingPar, sss: customSSS, slope: customSlope, holes };
   }
   return null;
 }
@@ -62,21 +76,41 @@ function courseBaseName(courseData) {
   return key ? key.replace(/\s*-\s*\d+\s*Hole$/i, '') : '';
 }
 
-// WHS course handicap → adjusted for number of holes played
-function calcPlayingHCP(course, totalHoles) {
-  if (course.slope == null || course.sss == null) return Math.round(hcp * totalHoles / 18);
-  const ch = Math.round(hcp * (course.slope / 113) + (course.sss - course.par));
+// WHS course handicap for any player, adjusted for the number of holes played.
+// sss/slope are always 18-hole-equivalent ratings, so ratingPar (the par those ratings
+// were measured against) is used here rather than the par of the holes being played.
+function calcPlayingHCP(playerHcp, course, totalHoles) {
+  if (course.slope == null || course.sss == null) return Math.round(playerHcp * totalHoles / 18);
+  const ratingPar = course.ratingPar ?? course.par;
+  const ch = Math.round(playerHcp * (course.slope / 113) + (course.sss - ratingPar));
   return Math.round(ch * totalHoles / 18);
+}
+
+// Stroke indexes are ranked 1..18 across a whole course entry, but a round may play a
+// subset of it (a single nine), repeat holes (a second round), or use holes with no SI
+// at all (custom courses). Rank the holes actually being played into a dense 1..n so
+// the stroke allocation below hands out exactly the playing handicap, no more or less.
+function strokeRanks(course) {
+  const order = course.holes.map((h, i) => ({ i, si: h.si == null ? Infinity : h.si }));
+  // Ties — a repeated nine, or holes with no SI — fall back to the order played.
+  order.sort((a, b) => a.si - b.si || a.i - b.i);
+  const ranks = new Array(course.holes.length);
+  order.forEach((o, r) => { ranks[o.i] = r + 1; });
+  return ranks;
 }
 
 // How many extra strokes a player receives on a given hole (0-based index)
 function strokesOnHole(holeIdx, playingHcp, course) {
-  const si   = course.holes[holeIdx].si;
   const numHoles = course.holes.length;
-  const base = Math.floor(playingHcp / numHoles);
-  const rem  = playingHcp % numHoles;
-  if (si == null) return base;
-  return base + (si <= rem ? 1 : 0);
+  if (!numHoles) return 0;
+  const rank = strokeRanks(course)[holeIdx];
+  if (playingHcp >= 0) {
+    return Math.floor(playingHcp / numHoles) + (rank <= playingHcp % numHoles ? 1 : 0);
+  }
+  // A negative course handicap gives strokes back, starting at the easiest hole, so
+  // count in from the other end of the ranking.
+  const give = -playingHcp;
+  return -(Math.floor(give / numHoles) + (numHoles - rank < give % numHoles ? 1 : 0));
 }
 
 // Stableford points for a hole (returns null if hole not played)
@@ -128,6 +162,7 @@ const HOLE_OPTIONS   = [5, 9, 18];
 let selectedCourse   = '';
 let selectedHoles    = 0;   // 0 = not yet chosen
 let selectedNine     = null; // 'front' | 'back' | null — only used when 9 holes derived from 18
+let secondNine       = null; // 'front' | 'back' | null — the nine played in an added second round
 let selectedStart    = null; // 'front' | 'back' | null — which 9 to start on for a full 18
 let secondRound      = false; // play the selected holes twice (e.g. 9 → 18)
 let customHolePars   = [];   // per-hole par for custom/Others courses (null = not set)
@@ -155,6 +190,7 @@ function saveState() {
   localStorage.setItem('gct_selectedholes', selectedHoles);
   localStorage.setItem('gct_secondround',   secondRound ? '1' : '');
   localStorage.setItem('gct_selectednine',  selectedNine ?? '');
+  localStorage.setItem('gct_secondnine',    secondNine ?? '');
   localStorage.setItem('gct_selectedstart', selectedStart ?? '');
   localStorage.setItem('gct_course',    selectedCourse);
   localStorage.setItem('gct_hcp',       hcp);
@@ -170,6 +206,7 @@ function loadState() {
   const savedSelHoles   = localStorage.getItem('gct_selectedholes');
   const savedSecondRound = localStorage.getItem('gct_secondround');
   const savedNine       = localStorage.getItem('gct_selectednine');
+  const savedSecondNine = localStorage.getItem('gct_secondnine');
   const savedStart      = localStorage.getItem('gct_selectedstart');
   const savedCourse     = localStorage.getItem('gct_course');
   const savedCustomPars = localStorage.getItem('gct_custompars');
@@ -180,6 +217,7 @@ function loadState() {
   selectedHoles  = savedSelHoles ? parseInt(savedSelHoles, 10) : HOLES;
   secondRound    = savedSecondRound === '1';
   selectedNine   = savedNine  || null;
+  secondNine     = savedSecondNine || null;
   selectedStart  = savedStart || null;
   if (savedCourse)     selectedCourse = savedCourse;
   if (savedCustomPars) customHolePars = JSON.parse(savedCustomPars);
@@ -377,13 +415,6 @@ function updatePutterUI(animate) {
   if (minusBtn) minusBtn.disabled = n === 0;
 }
 
-// HCP calc for any player (not just the main one)
-function calcPlayerPlayingHCP(playerHcp, course, totalHoles) {
-  if (course.slope == null || course.sss == null) return Math.round(playerHcp * totalHoles / 18);
-  const ch = Math.round(playerHcp * (course.slope / 113) + (course.sss - course.par));
-  return Math.round(ch * totalHoles / 18);
-}
-
 function renderPartnerScores() {
   const cd = getCourseData();
   getSimplePlayers().forEach((player, pIdx) => {
@@ -397,7 +428,7 @@ function renderPartnerScores() {
     // Stableford for this player
     if (sfEl && cd && gross) {
       // Recalc with player's own HCP
-      const playerPH = calcPlayerPlayingHCP(player.hcp, cd, HOLES);
+      const playerPH = calcPlayingHCP(player.hcp, cd, HOLES);
       const pts = stablefordPoints(hole - 1, gross, playerPH, cd);
       sfEl.textContent = pts !== null ? `${pts} pts` : '';
       sfEl.className = 'partner-sf' + (pts >= 2 ? ' good' : pts === 0 ? ' bad' : '');
@@ -431,7 +462,7 @@ function render() {
   if (parEl) {
     const cd = getCourseData();
     if (cd && hole <= cd.holes.length) {
-      const ph = calcPlayingHCP(cd, HOLES);
+      const ph = calcPlayingHCP(hcp, cd, HOLES);
       const s  = strokesOnHole(hole - 1, ph, cd);
       const holePar = cd.holes[hole-1].par;
       parEl.textContent = holePar !== null ? 'Par ' + holePar + (s > 0 ? ' +' + s : '') : '';
@@ -479,7 +510,10 @@ document.getElementById('next').addEventListener('click', () => { if (hole < HOL
 function activateSecondRound(newNine) {
   // newNine: 'front' | 'back' | null (null = repeat same)
   secondRound = true;
-  if (newNine) selectedNine = newNine;
+  // Record which nine the extra holes are played on separately — overwriting
+  // selectedNine here would re-score the already-played first nine against the
+  // other nine's pars and stroke indexes.
+  secondNine = newNine || selectedNine;
   HOLES = selectedHoles * 2;
   while (round.length < HOLES) round.push([]);
   saveState();
@@ -545,7 +579,7 @@ function renderSummaryFor(playerIdx) {
   const cd = getCourseData();
   const player = players[playerIdx];
   const isDetailed = player.mode === 'detailed';
-  const ph = cd ? calcPlayerPlayingHCP(isDetailed ? hcp : player.hcp, cd, HOLES) : 0;
+  const ph = cd ? calcPlayingHCP(isDetailed ? hcp : player.hcp, cd, HOLES) : 0;
 
   let totalSF = 0, sfHoles = 0, adjGrossTotal = 0, total = 0, holesPlayed = 0;
 
@@ -654,7 +688,7 @@ document.getElementById('sumBtn').addEventListener('click', () => {
     const leaderboard = players.map((p, idx) => {
       let totalSF = 0;
       const isDetailed = p.mode === 'detailed';
-      const ph = calcPlayerPlayingHCP(isDetailed ? hcp : p.hcp, cd, HOLES);
+      const ph = calcPlayingHCP(isDetailed ? hcp : p.hcp, cd, HOLES);
 
       for (let i = 0; i < HOLES; i++) {
         const gross = isDetailed ? round[i].length : p.round[i];
@@ -968,7 +1002,7 @@ function buildHoleOpts(course) {
   const parGrid    = document.getElementById('parGrid');
   const options = holeOptionsFor(course);
   // If current selectedHoles isn't valid for this course, reset it
-  if (!options.includes(selectedHoles)) { selectedHoles = 0; selectedNine = null; selectedStart = null; }
+  if (!options.includes(selectedHoles)) { selectedHoles = 0; selectedNine = null; secondNine = null; selectedStart = null; }
   nineOpts.style.display = 'none';
   startOpts.style.display = 'none';
   parPrompt.style.display = 'none';
@@ -982,6 +1016,7 @@ function buildHoleOpts(course) {
     btn.addEventListener('click', () => {
       selectedHoles = n;
       selectedNine = null;
+      secondNine = null;
       selectedStart = null;
       holesOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
       btn.classList.add('sel');
@@ -1168,6 +1203,7 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   const v = parseInt(hcpInput.value, 10);
   hcp = isNaN(v) ? 33 : Math.min(54, Math.max(0, v));
   secondRound = false;
+  secondNine = null;
   HOLES = selectedHoles;
   round = Array.from({length: HOLES}, () => []);
   getSimplePlayers().forEach(p => { p.round = Array(HOLES).fill(null); });
