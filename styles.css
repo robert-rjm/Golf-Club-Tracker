@@ -221,6 +221,17 @@
     font-size: 8px; font-weight: 700; letter-spacing: 1.5px;
     text-transform: uppercase; color: rgba(201,168,76,0.5);
   }
+  /* Compact variant for the score-only breakdown rows */
+  .putter-step-btn.step-sm {
+    flex: 0 0 38px; height: 38px;
+    font-size: 22px; border-radius: 10px;
+  }
+  /* The par a score-only hole sits on before anything is logged */
+  .putter-count.pending { color: rgba(201,168,76,0.3); }
+  .score-hint {
+    font-size: 11px; color: rgba(255,255,255,0.28);
+    text-align: center; font-style: italic;
+  }
 
   /* ── PLAYER OPTIONS ── */
   .partner-list {
@@ -258,6 +269,9 @@
     font-size: 22px;
     font-weight: 700;
   }
+  .partner-count.bump { animation: bump 0.18s ease; }
+  /* The par a partner's hole sits on before anything is entered */
+  .partner-count.pending { opacity: 0.3; cursor: pointer; }
   .partner-label {
     font-size: 10px;
     opacity: 0.5;
@@ -505,6 +519,10 @@
     color: var(--cream);
   }
   .lobby-opt:active { transform: scale(0.92); }
+  .lobby-hint {
+    font-size: 11px; color: rgba(255,255,255,0.3);
+    margin-top: 7px; line-height: 1.4;
+  }
   .lobby-custom-input {
     background: rgba(255,255,255,0.05);
     border: 1.5px solid rgba(255,255,255,0.12);

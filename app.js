@@ -5,8 +5,9 @@ const ALL_CLUBS = {
   'Wedges':         ['PW', 'PA', 'GW', 'AW', 'SW', 'LW']
 };
 
-// Logged alongside clubs but not clubs, so they never count towards "Most Used"
-const NOT_A_CLUB = ['Putter', 'Penalty'];
+// Logged alongside clubs but not clubs, so they never count towards "Most Used".
+// 'Shot' is the placeholder a score-only round logs in place of a club name.
+const NOT_A_CLUB = ['Putter', 'Penalty', 'Shot'];
 
 function withSecondRound(courseObj) {
   if (!secondRound) return courseObj;
@@ -207,6 +208,7 @@ let lobbySecondRound = false; // lobby picked 18 on a 9-hole course — play its
 let customHolePars   = [];   // per-hole par for custom/Others courses (null = not set)
 let customSSS        = null; // Standard Scratch Score for custom courses
 let customSlope      = null; // Slope rating for custom courses
+let trackClubs       = true; // false = score-only round: one total per hole, no club per shot
 let hcp = localStorage.getItem('gct_hcp') !== null
   ? parseInt(localStorage.getItem('gct_hcp'), 10)
   : DEFAULT_HCP;
@@ -239,6 +241,7 @@ function saveState() {
   localStorage.setItem('gct_custompars',  JSON.stringify(customHolePars));
   localStorage.setItem('gct_customsss',   customSSS   ?? '');
   localStorage.setItem('gct_customslope', customSlope ?? '');
+  localStorage.setItem('gct_trackclubs',  trackClubs ? '1' : '');
   localStorage.setItem('gct_players', JSON.stringify(players));
 }
 function loadState() {
@@ -282,6 +285,9 @@ function loadState() {
   const savedSlope = localStorage.getItem('gct_customslope');
   if (savedSSS)   customSSS   = savedSSS   ? parseFloat(savedSSS)   : null;
   if (savedSlope) customSlope = savedSlope ? parseFloat(savedSlope) : null;
+  // Absent on rounds saved before score-only mode existed — those tracked clubs
+  const savedTrackClubs = localStorage.getItem('gct_trackclubs');
+  trackClubs = savedTrackClubs === null ? true : savedTrackClubs === '1';
 }
 loadState();
 
@@ -312,6 +318,19 @@ function buildClubButtons() {
   const area = document.getElementById('clubsArea');
   area.innerHTML = '';
 
+  if (trackClubs) {
+    buildClubGrids(area);
+    buildPutterStepper(area);
+    buildPenaltyButton(area);
+  } else {
+    buildScorePad(area);
+    buildBreakdownSteppers(area);
+  }
+
+  buildPartnerSteppers(area);
+}
+
+function buildClubGrids(area) {
   // Filter using master list order, not activeBag order
   const groups = {
     'Woods & Hybrid': ALL_CLUBS['Woods & Hybrid'].filter(c => activeBag.includes(c)),
@@ -348,7 +367,10 @@ function buildClubButtons() {
     area.appendChild(group);
   });
 
-  // Putter stepper — always present
+}
+
+function buildPutterStepper(area) {
+  // Putter stepper — always present alongside the clubs
   const putterGroup = document.createElement('div');
   putterGroup.className = 'group';
   putterGroup.innerHTML = `
@@ -372,7 +394,9 @@ function buildClubButtons() {
     if (n > 0) { setPutterCount(n - 1); updatePutterUI(true); saveState(); render(); }
   });
 
-  // Penalty button
+}
+
+function buildPenaltyButton(area) {
   const penaltyGroup = document.createElement('div');
   penaltyGroup.className = 'group';
   penaltyGroup.innerHTML = `<div class="group-title">Penalty</div>`;
@@ -391,7 +415,105 @@ function buildClubButtons() {
   penaltyGroup.appendChild(penaltyBtn);
   area.appendChild(penaltyGroup);
 
-  // ── Partner score steppers ──
+}
+
+// ── SCORE-ONLY PAD ──
+// The total is the primary number. Putts and penalties below are a breakdown *of* it,
+// never an addition to it, so forgetting to log a putt can never make the score wrong.
+function buildScorePad(area) {
+  const group = document.createElement('div');
+  group.className = 'group';
+  group.innerHTML = `
+    <div class="group-title">Score</div>
+    <div class="putter-stepper">
+      <button class="putter-step-btn" id="scoreMinus">−</button>
+      <div class="putter-count-wrap">
+        <div class="putter-count" id="scoreCount">0</div>
+        <div class="putter-label" id="scoreLabel">Shots</div>
+      </div>
+      <button class="putter-step-btn" id="scorePlus">+</button>
+    </div>
+    <div class="score-hint" id="scoreHint"></div>`;
+  area.appendChild(group);
+
+  // An unplayed hole sits on its par: tapping the number takes par, ± steps away from
+  // it. Nothing is written to `round` until one of those happens, so an unvisited hole
+  // stays genuinely empty for the strip, "holes logged" and the Stableford total.
+  document.getElementById('scorePlus').addEventListener('click', () => {
+    setHoleTotal((holeTotal() || pendingScore() || 0) + 1);
+    bumpScore(); saveState(); render();
+  });
+  document.getElementById('scoreMinus').addEventListener('click', () => {
+    const from = holeTotal() || pendingScore();
+    if (!from || from <= 1) return;
+    setHoleTotal(from - 1);
+    bumpScore(); saveState(); render();
+  });
+  document.getElementById('scoreCount').addEventListener('click', () => {
+    if (holeTotal()) return;               // already scored — the steppers edit it
+    const par = pendingScore();
+    if (!par) return;                      // no par data to preselect
+    setHoleTotal(par);
+    bumpScore(); saveState(); render();
+  });
+}
+
+function buildBreakdownSteppers(area) {
+  const group = document.createElement('div');
+  group.className = 'group';
+  group.innerHTML = `
+    <div class="group-title">Of which (optional)</div>
+    <div class="partner-list">
+      <div class="partner-row">
+        <div class="partner-name">Putts</div>
+        <div class="partner-stepper">
+          <button class="putter-step-btn step-sm" id="putterMinus" disabled>−</button>
+          <div class="partner-count-wrap"><div class="partner-count" id="putterCount">0</div></div>
+          <button class="putter-step-btn step-sm" id="putterPlus">+</button>
+        </div>
+      </div>
+      <div class="partner-row">
+        <div class="partner-name">⚠ Penalties</div>
+        <div class="partner-stepper">
+          <button class="putter-step-btn step-sm" id="penaltyMinus" disabled>−</button>
+          <div class="partner-count-wrap"><div class="partner-count" id="penaltyCount">0</div></div>
+          <button class="putter-step-btn step-sm" id="penaltyPlus">+</button>
+        </div>
+      </div>
+    </div>`;
+  area.appendChild(group);
+
+  // Both steppers only ever reassign strokes already inside the total, so the score
+  // never moves underneath the golfer. `updateScorePadUI` disables + when it is full.
+  const bump = id => {
+    const el = document.getElementById(id);
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  };
+  const room = () => holeTotal() - getPutterCount() - getPenaltyCount();
+
+  document.getElementById('putterPlus').addEventListener('click', () => {
+    if (room() <= 0) return;
+    setBreakdown(getPutterCount() + 1, getPenaltyCount());
+    bump('putterCount'); saveState(); render();
+  });
+  document.getElementById('putterMinus').addEventListener('click', () => {
+    if (getPutterCount() <= 0) return;
+    setBreakdown(getPutterCount() - 1, getPenaltyCount());
+    bump('putterCount'); saveState(); render();
+  });
+  document.getElementById('penaltyPlus').addEventListener('click', () => {
+    if (room() <= 0) return;
+    setBreakdown(getPutterCount(), getPenaltyCount() + 1);
+    bump('penaltyCount'); saveState(); render();
+  });
+  document.getElementById('penaltyMinus').addEventListener('click', () => {
+    if (getPenaltyCount() <= 0) return;
+    setBreakdown(getPutterCount(), getPenaltyCount() - 1);
+    bump('penaltyCount'); saveState(); render();
+  });
+}
+
+function buildPartnerSteppers(area) {
   const simplePlayers = getSimplePlayers();
   if (simplePlayers.length > 0) {
     const partnerGroup = document.createElement('div');
@@ -411,8 +533,8 @@ function buildClubButtons() {
         <div class="partner-stepper">
           <button class="putter-step-btn partner-minus" data-pidx="${pIdx}">−</button>
           <div class="partner-count-wrap">
-            <div class="partner-count" id="partnerCount-${pIdx}">—</div>
-            <div class="partner-label">shots</div>
+            <div class="partner-count" id="partnerCount-${pIdx}" data-pidx="${pIdx}">—</div>
+            <div class="partner-label" id="partnerLabel-${pIdx}">shots</div>
           </div>
           <button class="putter-step-btn partner-plus" data-pidx="${pIdx}">+</button>
         </div>
@@ -422,14 +544,21 @@ function buildClubButtons() {
     });
 
     partnerGroup.appendChild(partnerList);
+
+    const hint = document.createElement('div');
+    hint.className = 'score-hint';
+    hint.textContent = 'Tap a number to take par';
+    partnerGroup.appendChild(hint);
+
     area.appendChild(partnerGroup);
 
-    // Event listeners
+    // Event listeners. Like the main pad, an unscored hole sits on its par: ± steps away
+    // from it and tapping the number takes it, but nothing is written to the partner's
+    // card until one of those happens, so an unplayed hole stays genuinely empty.
     partnerList.querySelectorAll('.partner-plus').forEach(btn => {
       btn.addEventListener('click', () => {
         const p = getSimplePlayers()[btn.dataset.pidx];
-        const current = p.round[hole - 1];
-        p.round[hole - 1] = (current || 0) + 1;
+        p.round[hole - 1] = (p.round[hole - 1] || partnerPar(p) || 0) + 1;
         saveState();
         renderPartnerScores();
       });
@@ -439,14 +568,38 @@ function buildClubButtons() {
       btn.addEventListener('click', () => {
         const p = getSimplePlayers()[btn.dataset.pidx];
         const current = p.round[hole - 1];
-        if (current && current > 0) {
+        if (current) {
+          // Stepping below 1 clears the hole, putting it back on the par preselect
           p.round[hole - 1] = current - 1 || null;
-          saveState();
-          renderPartnerScores();
+        } else {
+          const par = partnerPar(p);
+          if (!par || par <= 1) return;
+          p.round[hole - 1] = par - 1;
         }
+        saveState();
+        renderPartnerScores();
+      });
+    });
+
+    partnerList.querySelectorAll('.partner-count').forEach(el => {
+      el.addEventListener('click', () => {
+        const p = getSimplePlayers()[el.dataset.pidx];
+        if (p.round[hole - 1]) return;        // already scored — the steppers edit it
+        const par = partnerPar(p);
+        if (!par) return;                     // no par data to preselect
+        p.round[hole - 1] = par;
+        saveState();
+        renderPartnerScores();
       });
     });
   }
+}
+
+// The par a partner's current hole is preselected at. Hole pars are shared across tees
+// and categories, but the player is passed through so this follows their own card.
+function partnerPar(player) {
+  const cd = getCourseData(player);
+  return cd && hole <= cd.holes.length ? cd.holes[hole-1].par : null;
 }
 
 // ── PUTTER HELPERS ──
@@ -471,6 +624,75 @@ function updatePutterUI(animate) {
   if (minusBtn) minusBtn.disabled = n === 0;
 }
 
+// ── SCORE-ONLY HELPERS ──
+// A score-only hole stores the same token array as a tracked one — plain 'Shot'
+// placeholders in place of club names — so every count, chip, Stableford point,
+// adjusted gross and scorecard cell downstream reads exactly as it always did.
+// Canonical order mirrors setPutterCount: shots, then penalties, then putts.
+function getPenaltyCount() {
+  return round[hole-1].filter(c => c === 'Penalty').length;
+}
+function holeTotal() {
+  return round[hole-1].length;
+}
+function writeHole(total, putts, pens) {
+  round[hole-1] = [
+    ...Array(Math.max(0, total - putts - pens)).fill('Shot'),
+    ...Array(pens).fill('Penalty'),
+    ...Array(putts).fill('Putter')
+  ];
+}
+// The total is authoritative: a breakdown that no longer fits inside it is trimmed
+function setHoleTotal(n) {
+  n = Math.max(0, n);
+  const putts = Math.min(getPutterCount(), n);
+  const pens  = Math.min(getPenaltyCount(), n - putts);
+  writeHole(n, putts, pens);
+}
+// ...and the breakdown can never move the total, only reassign strokes inside it
+function setBreakdown(putts, pens) {
+  const total = holeTotal();
+  putts = Math.min(Math.max(0, putts), total);
+  pens  = Math.min(Math.max(0, pens), total - putts);
+  writeHole(total, putts, pens);
+}
+// The par this hole is preselected at before anything is logged.
+// null on a custom course whose pars were never entered.
+function pendingScore() {
+  const cd = getCourseData(mainPlayer());
+  return cd && hole <= cd.holes.length ? cd.holes[hole-1].par : null;
+}
+function bumpScore() {
+  const el = document.getElementById('scoreCount');
+  if (!el) return;
+  el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+}
+function updateScorePadUI() {
+  const countEl = document.getElementById('scoreCount');
+  if (!countEl) return;
+  const total = holeTotal();
+  const par   = pendingScore();
+  const putts = getPutterCount();
+  const pens  = getPenaltyCount();
+
+  countEl.textContent = total || (par ?? '—');
+  countEl.classList.toggle('pending', !total);
+  document.getElementById('scoreLabel').textContent = total ? 'Shots' : 'Par';
+  document.getElementById('scoreHint').textContent  = total
+    ? ''
+    : par ? 'Tap the number to take par' : 'Tap + to start counting';
+  document.getElementById('scoreMinus').disabled = (total || par || 0) <= 1;
+
+  // Strokes in the total not yet claimed by the breakdown
+  const room = total - putts - pens;
+  document.getElementById('putterCount').textContent  = putts;
+  document.getElementById('penaltyCount').textContent = pens;
+  document.getElementById('putterMinus').disabled  = putts === 0;
+  document.getElementById('penaltyMinus').disabled = pens === 0;
+  document.getElementById('putterPlus').disabled   = room <= 0;
+  document.getElementById('penaltyPlus').disabled  = room <= 0;
+}
+
 function renderPartnerScores() {
   getSimplePlayers().forEach((player, pIdx) => {
     // Same tee, but each player is rated under their own category
@@ -480,7 +702,12 @@ function renderPartnerScores() {
     if (!countEl) return;
 
     const gross = player.round[hole - 1];
-    countEl.textContent = gross || '—';
+    // An unscored hole shows its par, dimmed, until the golfer commits to a number
+    const par = cd && hole <= cd.holes.length ? cd.holes[hole-1].par : null;
+    countEl.textContent = gross || (par ?? '—');
+    countEl.classList.toggle('pending', !gross);
+    const labelEl = document.getElementById(`partnerLabel-${pIdx}`);
+    if (labelEl) labelEl.textContent = gross ? 'shots' : 'par';
 
     // Stableford for this player
     if (sfEl && cd && gross) {
@@ -493,9 +720,10 @@ function renderPartnerScores() {
       sfEl.textContent = '';
     }
 
-    // Disable minus at 0/null
+    // With a score logged, minus always works — stepping below 1 clears the hole.
+    // On the par preselect it only makes sense if there is a par above 1 to step down from.
     const minusBtn = document.querySelector(`.partner-minus[data-pidx="${pIdx}"]`);
-    if (minusBtn) minusBtn.disabled = !gross || gross <= 0;
+    if (minusBtn) minusBtn.disabled = gross ? false : !(par > 1);
   });
 }
 
@@ -512,7 +740,8 @@ function render() {
   document.querySelector('.chip.active')
     ?.scrollIntoView({block:'nearest', inline:'center', behavior:'smooth'});
 
-  updatePutterUI(false);
+  if (trackClubs) updatePutterUI(false);
+  else            updateScorePadUI();
 
   // Par + stroke allowance label for current hole
   const parEl = document.getElementById('holePar');
@@ -529,8 +758,10 @@ function render() {
     renderPartnerScores();
   }
 
-  // Lock settings gear once round is started
-  document.getElementById('settingsBtn').classList.toggle('locked', roundStarted());
+  // Lock settings gear once round is started; a score-only round has no bag to edit
+  const gearBtn = document.getElementById('settingsBtn');
+  gearBtn.style.visibility = trackClubs ? '' : 'hidden';
+  gearBtn.classList.toggle('locked', roundStarted());
 
   // Show "Continue round" button on last hole if second round not yet added
   const addNineBtn = document.getElementById('addNineBtn');
@@ -539,9 +770,21 @@ function render() {
   const shots = round[hole - 1];
   const countEl = document.getElementById('shotCount');
   if (countEl) countEl.textContent = shots.length > 0 ? shots.length : '';
+  const labelEl = document.getElementById('logLabelText');
+  if (labelEl) labelEl.textContent = trackClubs ? 'Shots this hole' : 'Score this hole';
   const row = document.getElementById('shotsRow');
   if (!shots.length) {
-    row.innerHTML = `<span class="no-shots">Tap a club to start hole ${hole}</span>`;
+    row.innerHTML = `<span class="no-shots">${trackClubs
+      ? `Tap a club to start hole ${hole}`
+      : `Set your score for hole ${hole}`}</span>`;
+  } else if (!trackClubs) {
+    // A row of identical 'Shot' pills would say nothing — show the breakdown instead
+    const putts = getPutterCount(), pens = getPenaltyCount();
+    row.innerHTML = [
+      `<span class="shot-pill">${shots.length} shot${shots.length === 1 ? '' : 's'}</span>`,
+      putts ? `<span class="shot-pill">${putts} putt${putts === 1 ? '' : 's'}</span>` : '',
+      pens  ? `<span class="shot-pill penalty">${pens} penalt${pens === 1 ? 'y' : 'ies'}</span>` : ''
+    ].join('');
   } else {
     row.innerHTML = shots.map((c, i) =>
       `<span class="shot-pill${c === 'Penalty' ? ' penalty' : ''}">
@@ -614,7 +857,13 @@ document.getElementById('addNineBtn').addEventListener('click', () => {
 
 // ── UNDO ──
 document.getElementById('undoBtn').addEventListener('click', () => {
-  if (round[hole-1].length) { round[hole-1].pop(); saveState(); render(); }
+  if (!round[hole-1].length) return;
+  // Score-only: take a stroke off the total rather than popping whichever token happens
+  // to be last, which would quietly drop a putt out of the breakdown as well.
+  if (trackClubs) round[hole-1].pop();
+  else            setHoleTotal(holeTotal() - 1);
+  saveState();
+  render();
 });
 
 // ── OVERLAY HELPERS (direct style — avoids Safari classList/flex bugs) ──
@@ -631,11 +880,23 @@ function hideOverlay(id) {
 const PLAYER_COLORS = ['#c9a84c', '#5fb0c9', '#e0973c', '#8fbf5f', '#d1637a', '#8a7fd6'];
 let summaryPlayerIdx = 0;
 
+// Summary pills for a hole with no club detail: the total, plus whatever breakdown a
+// score-only round recorded. Partners pass no tokens and get just the total.
+function countPills(tokens, gross) {
+  const putts = tokens ? tokens.filter(c => c === 'Putter').length : 0;
+  const pens  = tokens ? tokens.filter(c => c === 'Penalty').length : 0;
+  return `<span class="sum-pill">${gross} shot${gross === 1 ? '' : 's'}</span>`
+    + (putts ? `<span class="sum-pill">${putts} putt${putts === 1 ? '' : 's'}</span>` : '')
+    + (pens  ? `<span class="sum-pill">${pens} penalt${pens === 1 ? 'y' : 'ies'}</span>` : '');
+}
+
 // Builds the hole-by-hole log + stat boxes for one player (main or partner)
 function renderSummaryFor(playerIdx) {
   const player = players[playerIdx];
   const cd = getCourseData(player);
   const isDetailed = player.mode === 'detailed';
+  // A score-only round logs 'Shot' placeholders, so there are no club names to list
+  const showClubs  = isDetailed && trackClubs;
   const ph = cd ? calcPlayingHCP(isDetailed ? hcp : player.hcp, cd, HOLES) : 0;
 
   let totalSF = 0, sfHoles = 0, adjGrossTotal = 0, total = 0, holesPlayed = 0;
@@ -645,12 +906,12 @@ function renderSummaryFor(playerIdx) {
     const grossCount = isDetailed ? shots.length : (player.round[i] || 0);
     if (grossCount) { total += grossCount; holesPlayed++; }
 
-    const pills = isDetailed
+    const pills = showClubs
       ? (shots.length
           ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
           : '<span class="sum-none">No shots</span>')
       : (grossCount
-          ? `<span class="sum-pill">${grossCount} shot${grossCount === 1 ? '' : 's'}</span>`
+          ? countPills(shots, grossCount)
           : '<span class="sum-none">No shots</span>');
 
     let sfCol = '';
@@ -677,7 +938,8 @@ function renderSummaryFor(playerIdx) {
     </div>`;
   }).join('');
 
-  // "Most Used" club is only meaningful for the main player — partners aren't tracked per-club
+  // "Most Used" club is only meaningful for the main player — partners aren't tracked
+  // per-club, and a score-only round has no club names to rank at all
   let mostUsedBox = '';
   if (isDetailed) {
     const freq = {};
@@ -685,14 +947,22 @@ function renderSummaryFor(playerIdx) {
       if (!NOT_A_CLUB.includes(c)) freq[c] = (freq[c] || 0) + 1;
     }));
     const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]);
-    let topLabel = '—';
     if (sorted.length) {
       const topCount = sorted[0][1];
       const tied = sorted.filter(e => e[1] === topCount).map(e => e[0]);
-      topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
+      const topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
+      mostUsedBox = `<div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`;
     }
-    mostUsedBox = `<div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`;
   }
+
+  // Putts are worth showing whenever any were logged — in a score-only round they are
+  // the whole payoff for keeping the optional breakdown
+  const puttTotal = isDetailed
+    ? round.reduce((n, shots) => n + shots.filter(c => c === 'Putter').length, 0)
+    : 0;
+  const puttsBox = puttTotal
+    ? `<div class="stat-box"><div class="stat-val">${puttTotal}</div><div class="stat-lbl">Putts</div></div>`
+    : '';
 
   const diff = cd ? scoreDifferential(cd, sfHoles, adjGrossTotal) : null;
   const diffBox = diff !== null
@@ -704,11 +974,13 @@ function renderSummaryFor(playerIdx) {
        <div class="stat-box"><div class="stat-val">${sfHoles > 0 ? totalSF : '—'}</div><div class="stat-lbl">Stableford</div></div>
        <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
        ${mostUsedBox}
+       ${puttsBox}
        ${diffBox}`
     : `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
        <div class="stat-box"><div class="stat-val">${isDetailed && hcp > 0 ? total - Math.round(hcp * HOLES / 18) : '—'}</div><div class="stat-lbl">Net Score</div></div>
        <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
-       ${mostUsedBox}`;
+       ${mostUsedBox}
+       ${puttsBox}`;
 
   document.getElementById('ovStats').innerHTML = statsBoxes;
 
@@ -794,9 +1066,19 @@ document.getElementById('copyBtn').addEventListener('click', () => {
     `Holes: ${HOLES}`,
     hcp > 0 ? `HCP: ${hcp}` : null,
   ].filter(Boolean).join(' | ');
-  const rows = round.map((shots, i) =>
-    `Hole ${i+1} (${shots.length} shots): ${shots.length ? shots.join(' → ') : '—'}`
-  ).join('\n');
+  const rows = round.map((shots, i) => {
+    if (trackClubs) {
+      return `Hole ${i+1} (${shots.length} shots): ${shots.length ? shots.join(' → ') : '—'}`;
+    }
+    // Score-only: a run of identical 'Shot' tokens is noise — print the breakdown
+    const putts = shots.filter(c => c === 'Putter').length;
+    const pens  = shots.filter(c => c === 'Penalty').length;
+    const extra = [
+      putts ? `${putts} putt${putts === 1 ? '' : 's'}` : null,
+      pens  ? `${pens} penalt${pens === 1 ? 'y' : 'ies'}` : null
+    ].filter(Boolean).join(', ');
+    return `Hole ${i+1}: ${shots.length || '—'}${extra ? ` (${extra})` : ''}`;
+  }).join('\n');
 
   // Scorecard table (Hole, Par, score per player) appended at the bottom. No player is
   // passed because this only reads hole pars, which are shared across tees and categories.
@@ -990,6 +1272,30 @@ function buildCategoryOpts() {
     wrap.appendChild(btn);
   });
   row.style.display = '';
+}
+
+// Clubs vs score-only. Both write the same token array per hole, so the choice only
+// changes what the pad logs and how it is displayed — never how anything is scored.
+function buildTrackOpts() {
+  const wrap = document.getElementById('trackOpts');
+  wrap.innerHTML = '';
+  [
+    { label: '⛳ Clubs & shots', val: true  },
+    { label: '🔢 Score only',    val: false }
+  ].forEach(({ label, val }) => {
+    const btn = document.createElement('button');
+    btn.className = 'lobby-opt' + (trackClubs === val ? ' sel' : '');
+    btn.textContent = label;
+    btn.addEventListener('click', () => {
+      trackClubs = val;
+      saveState();
+      buildTrackOpts();
+    });
+    wrap.appendChild(btn);
+  });
+  document.getElementById('trackHint').textContent = trackClubs
+    ? 'Log the club behind every shot.'
+    : 'Just a total per hole, preselected at par. Putts and penalties optional.';
 }
 
 function buildStartOpts() {
@@ -1391,6 +1697,8 @@ function openLobby() {
     // is only ever remembered from what was entered last time, via gct_hcp.
     hcp = isNaN(v) ? DEFAULT_HCP : Math.min(54, Math.max(0, v));
   };
+
+  buildTrackOpts();
 
   buildPlayerLobby();
 
