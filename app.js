@@ -165,6 +165,7 @@ let selectedNine     = null; // 'front' | 'back' | null — only used when 9 hol
 let secondNine       = null; // 'front' | 'back' | null — the nine played in an added second round
 let selectedStart    = null; // 'front' | 'back' | null — which 9 to start on for a full 18
 let secondRound      = false; // play the selected holes twice (e.g. 9 → 18)
+let lobbySecondRound = false; // lobby picked 18 on a 9-hole course — play its nine twice
 let customHolePars   = [];   // per-hole par for custom/Others courses (null = not set)
 let customSSS        = null; // Standard Scratch Score for custom courses
 let customSlope      = null; // Slope rating for custom courses
@@ -797,6 +798,8 @@ function holeOptionsFor(course) {
   const set = new Set(counts);
   // Any course with an 18-hole entry also offers 9 (front or back)
   if (set.has(18)) set.add(9);
+  // A course with only a 9-hole entry offers 18 by playing that nine twice
+  if (set.has(9) && !set.has(18)) set.add(18);
   // Unknown/custom courses default to 9 and 18
   if (set.size === 0) { set.add(9); set.add(18); }
   return [...set].sort((a, b) => a - b);
@@ -810,6 +813,24 @@ function nineIsDerived(course) {
   if (entries.length === 0) return false; // unknown/custom course — no data to derive from
   const hasExplicit9 = entries.some(k => COURSES[k].holes.length === 9);
   return !hasExplicit9;
+}
+
+// Returns true if 18 holes for this course means playing its nine twice, because the
+// course has a 9-hole entry and no 18-hole one. The duplication is the same one the
+// "add another nine" button applies mid-round — withSecondRound repeats the hole list
+// and leaves par/ratingPar/sss/slope at the course's rating values.
+function eighteenIsDoubledNine(course) {
+  const entries = Object.keys(COURSES).filter(k =>
+    k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course
+  );
+  return entries.some(k => COURSES[k].holes.length === 9)
+      && !entries.some(k => COURSES[k].holes.length === 18);
+}
+
+// The hole count the lobby is showing as picked. selectedHoles is always one lap, so a
+// doubled nine is stored as 9 + lobbySecondRound rather than as selectedHoles = 18.
+function lobbyHoleChoice() {
+  return selectedHoles * (lobbySecondRound ? 2 : 1);
 }
 
 // Returns true when the course has an 18-hole entry (so front/back start matters)
@@ -1001,8 +1022,19 @@ function buildHoleOpts(course) {
   const parPrompt  = document.getElementById('parPrompt');
   const parGrid    = document.getElementById('parGrid');
   const options = holeOptionsFor(course);
-  // If current selectedHoles isn't valid for this course, reset it
-  if (!options.includes(selectedHoles)) { selectedHoles = 0; selectedNine = null; secondNine = null; selectedStart = null; }
+  // The choice is held as one lap plus a repeat flag, but 18 means "the nine twice" on
+  // some courses and a real 18-hole card on others — so re-express it for this course
+  // before validating, or switching courses leaves a doubled nine on an 18-hole entry.
+  if (selectedHoles > 0) {
+    const choice = lobbyHoleChoice();
+    lobbySecondRound = choice === 18 && eighteenIsDoubledNine(course);
+    selectedHoles = lobbySecondRound ? 9 : choice;
+  }
+  // If the current choice isn't valid for this course, reset it
+  if (!options.includes(lobbyHoleChoice())) {
+    selectedHoles = 0; selectedNine = null; secondNine = null; selectedStart = null;
+    lobbySecondRound = false;
+  }
   nineOpts.style.display = 'none';
   startOpts.style.display = 'none';
   parPrompt.style.display = 'none';
@@ -1011,10 +1043,13 @@ function buildHoleOpts(course) {
   holesOpts.innerHTML = '';
   options.forEach(n => {
     const btn = document.createElement('button');
-    btn.className = 'lobby-opt' + (selectedHoles === n ? ' sel' : '');
+    btn.className = 'lobby-opt' + (lobbyHoleChoice() === n ? ' sel' : '');
     btn.textContent = n + ' holes';
     btn.addEventListener('click', () => {
-      selectedHoles = n;
+      // 18 on a 9-hole course is that nine played twice, so keep selectedHoles at one
+      // lap and flag the repeat — same shape as the mid-round "add another nine".
+      lobbySecondRound = n === 18 && eighteenIsDoubledNine(selectedCourse);
+      selectedHoles = lobbySecondRound ? 9 : n;
       selectedNine = null;
       secondNine = null;
       selectedStart = null;
@@ -1048,8 +1083,8 @@ function buildHoleOpts(course) {
   });
   // Re-show rows if already selected
   if (selectedHoles > 0) {
-    if (selectedHoles === 9 && nineIsDerived(course)) buildNineOpts();
-    if (selectedHoles === 18 && hasFullRound(course)) buildStartOpts();
+    if (lobbyHoleChoice() === 9 && nineIsDerived(course)) buildNineOpts();
+    if (lobbyHoleChoice() === 18 && hasFullRound(course)) buildStartOpts();
     if (isCustomCourse(course)) {
       // If pars already saved, skip prompt and show grid + submit button directly
       if (customHolePars.some(p => p !== null)) {
@@ -1115,6 +1150,8 @@ function buildPlayerLobby() {
 }
 
 function openLobby() {
+  // A round already doubling its nine should show 18 selected, not 9
+  lobbySecondRound = secondRound && eighteenIsDoubledNine(selectedCourse);
   // Rebuild course buttons
   const courseOpts = document.getElementById('courseOpts');
   courseOpts.innerHTML = '';
@@ -1189,7 +1226,7 @@ function updateLobbyStartBtn() {
   const nineLabel  = selectedNine  ? ` (${selectedNine} 9)`             : '';
   const startLabel = selectedStart ? ` from hole ${selectedStart === 'front' ? '1' : '10'}` : '';
   btn.textContent = ready
-    ? `Tee off → ${selectedHoles} holes at ${selectedCourse}${nineLabel}${startLabel}`
+    ? `Tee off → ${lobbyHoleChoice()} holes at ${selectedCourse}${nineLabel}${startLabel}`
     : needsNine && !selectedNine
       ? 'Select front or back 9 →'
       : needsStart && !selectedStart
@@ -1202,9 +1239,11 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   const hcpInput = document.getElementById('hcpInput');
   const v = parseInt(hcpInput.value, 10);
   hcp = isNaN(v) ? 33 : Math.min(54, Math.max(0, v));
-  secondRound = false;
-  secondNine = null;
-  HOLES = selectedHoles;
+  // A doubled nine starts already in its second round, exactly as if the nine had been
+  // played and "add another nine" pressed at the turn.
+  secondRound = lobbySecondRound;
+  secondNine  = lobbySecondRound ? selectedNine : null;
+  HOLES = selectedHoles * (lobbySecondRound ? 2 : 1);
   round = Array.from({length: HOLES}, () => []);
   getSimplePlayers().forEach(p => { p.round = Array(HOLES).fill(null); });
   hole  = 1;
