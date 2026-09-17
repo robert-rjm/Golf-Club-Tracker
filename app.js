@@ -273,6 +273,11 @@ function loadState() {
     // Players saved before categories existed default in rather than staying unrated
     if (!p.category) p.category = DEFAULT_CATEGORY;
   });
+  // Corrupted or hand-cleared storage could otherwise leave no detailed player at all,
+  // which mainPlayer() reports as undefined and every caller of it then trips over.
+  if (!players.some(p => p.mode === 'detailed')) {
+    players.unshift({ name: 'You', mode: 'detailed', category: DEFAULT_CATEGORY });
+  }
   const savedSSS   = localStorage.getItem('gct_customsss');
   const savedSlope = localStorage.getItem('gct_customslope');
   if (savedSSS)   customSSS   = savedSSS   ? parseFloat(savedSSS)   : null;
@@ -894,16 +899,35 @@ function hasFullRound(course) {
   );
 }
 
-// The tee colours and player categories below come from the entry actually in play, so
-// they follow the hole count: St Genis lists seven colours for its nine, but the 5-hole
-// compact entry lists only its own. Both are empty for a course with no `tees`.
+// The COURSES entry this round draws its ratings from. Deliberately does NOT go through
+// buildCourseData: that needs selectedNine to resolve a nine sliced out of an 18-hole
+// card, and falls back to the custom-course shape until one is picked. The tee and
+// category pickers are built before the front/back choice exists, so going through it
+// made a rated course look unrated and silently discarded the chosen tee.
+function courseEntry() {
+  const explicit = Object.values(COURSES).find(c =>
+    courseBaseName(c) === selectedCourse && c.holes.length === selectedHoles
+  );
+  if (explicit) return explicit;
+  // A nine derived from an 18-hole entry is rated off that entry, whichever nine it is
+  if (selectedHoles === 9) {
+    return Object.values(COURSES).find(c =>
+      courseBaseName(c) === selectedCourse && c.holes.length === 18
+    ) || null;
+  }
+  return null;
+}
+
+// Tee colours and categories follow the hole count: St Genis lists seven colours for its
+// nine, but its 5-hole compact entry lists only its own. Both are empty for a course with
+// no `tees`, which is how the pickers know to stay hidden.
 function teeColoursFor() {
-  const c = buildCourseData();
+  const c = courseEntry();
   return c && c.tees ? [...new Set(c.tees.map(t => t.colour))] : [];
 }
 
 function categoriesFor() {
-  const c = buildCourseData();
+  const c = courseEntry();
   return c && c.tees ? [...new Set(c.tees.filter(t => t.players).map(t => t.players))] : [];
 }
 
@@ -925,8 +949,8 @@ function buildTeeOpts() {
     section.style.display = 'none';
     return;
   }
-  const course = buildCourseData();
-  if (!colours.includes(selectedTee)) selectedTee = course.defaultTee || colours[0];
+  const course = courseEntry();
+  if (!colours.includes(selectedTee)) selectedTee = (course && course.defaultTee) || colours[0];
   colours.forEach(colour => {
     const btn = document.createElement('button');
     btn.className = 'lobby-opt' + (selectedTee === colour ? ' sel' : '');
@@ -944,15 +968,15 @@ function buildTeeOpts() {
   section.style.display = '';
 }
 
-// Category for the detailed player. Left unset by default — the app should not assume
-// one — in which case ratingFor takes the tee's first listed entry.
+// Category for the detailed player, defaulting to DEFAULT_CATEGORY. Acts as a radio:
+// there is always exactly one selected, so clicking the current one is a no-op.
 function buildCategoryOpts() {
   const wrap = document.getElementById('categoryOpts');
   const row  = document.getElementById('categoryRow');
   const cats = categoriesFor();
   wrap.innerHTML = '';
-  if (cats.length < 2) { row.style.display = 'none'; return; }
   const me = mainPlayer();
+  if (cats.length < 2 || !me) { row.style.display = 'none'; return; }
   cats.forEach(cat => {
     const btn = document.createElement('button');
     btn.className = 'lobby-opt' + (me.category === cat ? ' sel' : '');
@@ -1207,6 +1231,7 @@ function buildHoleOpts(course) {
       }
       buildTeeOpts();
       buildCategoryOpts();
+      buildPlayerLobby();   // partner tee/category rows follow the new hole count
       updateLobbyStartBtn();
     });
     holesOpts.appendChild(btn);
