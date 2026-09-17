@@ -3,7 +3,8 @@
 </p>
 
 <h1 align="center">Golf Club Tracker</h1>
-<p align="center"><i>A mobile web app companion for tracking which clubs you hit on every shot during a round of golf. Easy tap and track to review your round later.</i></p>
+<p align="center"><i>A mobile web app companion for keeping your card during a round of golf:<br>
+Log the club behind every shot or just keep track of your score. One phone keeps the card for the whole group, with Stableford making the scores comparable across HCP and tees.</i></p>
 
 <p align="center">
   <a href="https://robert-rjm.github.io/Golf-Club-Tracker/">
@@ -15,34 +16,37 @@
 
 ## Features
 
-- Track every shot hit per shot, per hole
-- Select your bag setup before the round, only see clubs you are carrying
-- View and edit shot sequences per hole
-- Automatic Stableford points calculation when course data (SSS, slope) is available
-- Get a round summary with total shots and most used clubs
-- Copy your full round to clipboard for sharing or notes
+**Two ways to keep your card.**
+
+- Either tracking the club behind every shot, providing the most insights, with **Clubs & Shots**.
+- Or alternatively, to only track the totals per hole, with the **Score Only** option.
 
 ## Usage
 
 For the best experience, add it to your home screen. Works also in any mobile browser.
 
-1. Open the [live app](https://robert-rjm.github.io/Golf-Club-Tracker/) in Safari
+1. Open the [live app](https://robert-rjm.github.io/Golf-Club-Tracker/) in your browser
 2. Tap **Share → Add to Home Screen**
 3. Opens as a standalone app with no browser chrome
 
 ## Supported Courses
 
-Course data (par, stroke index, SSS, slope) is stored in `courses.js`. Currently includes:
+Course data (par, stroke index, and SSS/slope per tee) is stored in `courses.js`. Currently includes:
 
-| Course | Holes | Par | Slope | Stableford |
-|--------|-------|-----|-------|------------|
-| St Genis | 9 - 18 | 37 | 114 | ✅ |
-| St Genis - 5 Hole | 5 | 17 | N/A | ❌ |
-| UGolf Aravella Andorra | 18 | 71 | 129 | ✅ |
-| Grandvalira Golf Soldeu | 9 - 18 | 33 | N/A | ❌ |
-| Other | 9 - 18 | selectable | N/A | ❌ |
+| Course | Holes | Par | Stableford |
+|--------|-------|-----|------------|
+| Golfclub St Genis | 9 · 18 | 37 (9 holes) | ✅ |
+| Golfclub St Genis — 5 Hole | 5 | 16 | ✅ |
+| Ugolf Aravella Andorra | 9 · 18 | 71 | ✅ |
+| Grandvalira Golf Soldeu | 9 · 18 | 33 (9 holes) | ✅ |
+| Others (custom) | 5 · 9 · 18 | you set each hole | only if you enter SSS & slope |
 
-> Stableford scoring requires SSS and slope to calculate your playing handicap. Courses without these values will still track clubs and shots, just without points.
+> The 5-hole course is reached by selecting **Golfclub St Genis**, then **5 holes**. Picking
+> 18 on a 9-hole course plays that nine twice.
+
+> Stableford needs SSS and Slope to work out your playing handicap. Every built-in course
+> has them for each tee; a custom course can still track shots and scores without them,
+> just without points.
 
 ### Want your course added?
 
@@ -52,7 +56,9 @@ Directly from the app, select **Others**: enter your course name, set the hole c
 
 1. Go to [Issues](../../issues) → **New Issue**
 2. Title it `Course Request: [Course Name]`
-3. Include: course name, number of holes, total par, SSS, slope, and par/SI for each hole
+3. Include: course name, number of holes, total par, par/SI for each hole, and the SSS
+   and slope **along with which tee they were measured from** — ratings differ per tee,
+   and for men and ladies
 
 ## License
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)

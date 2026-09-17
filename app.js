@@ -1277,8 +1277,8 @@ function buildCategoryOpts() {
 // the two can never drift. `afterPick` is what the host does once the choice is stored.
 function trackOptionButtons(afterPick) {
   return [
-    { label: '⛳ Clubs & shots', val: true,  sub: 'A club for every shot' },
-    { label: '🔢 Score only',   val: false, sub: 'Just a total per hole' }
+    { label: '⛳ Clubs & Shots', val: true,  sub: 'A club for every shot' },
+    { label: '🔢 Score Only',   val: false, sub: 'Just a total per hole' }
   ].map(({ label, val, sub }) => {
     const btn = document.createElement('button');
     // The current choice is highlighted, so dismissing the sheet keeps it
