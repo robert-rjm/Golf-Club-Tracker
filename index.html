@@ -50,12 +50,22 @@
 
 <!-- Continue-round sheet -->
 <div id="continueSheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;
-  background:var(--card);border-top:1px solid rgba(255,255,255,0.08);
+  background:var(--dark);border-top:1px solid rgba(255,255,255,0.08);
   border-radius:20px 20px 0 0;padding:20px 18px 32px;box-shadow:0 -8px 32px rgba(0,0,0,0.4)">
   <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.45);letter-spacing:0.5px;margin-bottom:14px">CONTINUE WITH</div>
   <div id="continueOpts" style="display:flex;gap:10px;flex-wrap:wrap"></div>
 </div>
 <div id="continueBackdrop" style="display:none;position:fixed;inset:0;z-index:199;background:rgba(0,0,0,0.45)"></div>
+
+<!-- Tracking sheet — shown at the first tee on every new round -->
+<div id="trackSheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;
+  background:var(--dark);border-top:1px solid rgba(255,255,255,0.08);
+  border-radius:20px 20px 0 0;box-shadow:0 -8px 32px rgba(0,0,0,0.4);
+  padding:20px 18px calc(32px + env(safe-area-inset-bottom))">
+  <div style="font-size:13px;font-weight:700;color:rgba(255,255,255,0.45);letter-spacing:0.5px;margin-bottom:14px">TRACK THIS ROUND</div>
+  <div id="trackOpts" style="display:flex;gap:10px"></div>
+</div>
+<div id="trackBackdrop" style="display:none;position:fixed;inset:0;z-index:199;background:rgba(0,0,0,0.45)"></div>
 
 <!-- Lobby overlay -->
 <div class="overlay" id="lobbyOverlay">
@@ -91,11 +101,6 @@
         <div class="lobby-label" style="font-size:12px">Rated as</div>
         <div class="lobby-opts" id="categoryOpts"></div>
       </div>
-    </div>
-    <div class="lobby-section">
-      <div class="lobby-label">Tracking</div>
-      <div class="lobby-opts" id="trackOpts"></div>
-      <div class="lobby-hint" id="trackHint"></div>
     </div>
     <div class="lobby-section" id="playersLobby"></div>
   </div>

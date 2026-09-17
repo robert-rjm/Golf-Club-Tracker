@@ -86,7 +86,6 @@
     transition: all 0.1s; flex-shrink: 0;
   }
   .settings-btn:active { background: rgba(201,168,76,0.2); color: var(--gold); transform: scale(0.86); }
-  .settings-btn.locked { opacity: 0.25; cursor: not-allowed; pointer-events: none; }
 
   /* ── HOLE STRIP ── */
   .strip-wrap {
@@ -519,10 +518,6 @@
     color: var(--cream);
   }
   .lobby-opt:active { transform: scale(0.92); }
-  .lobby-hint {
-    font-size: 11px; color: rgba(255,255,255,0.3);
-    margin-top: 7px; line-height: 1.4;
-  }
   .lobby-custom-input {
     background: rgba(255,255,255,0.05);
     border: 1.5px solid rgba(255,255,255,0.12);

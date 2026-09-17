@@ -758,11 +758,6 @@ function render() {
     renderPartnerScores();
   }
 
-  // Lock settings gear once round is started; a score-only round has no bag to edit
-  const gearBtn = document.getElementById('settingsBtn');
-  gearBtn.style.visibility = trackClubs ? '' : 'hidden';
-  gearBtn.classList.toggle('locked', roundStarted());
-
   // Show "Continue round" button on last hole if second round not yet added
   const addNineBtn = document.getElementById('addNineBtn');
   addNineBtn.style.display = (hole === HOLES && !secondRound) ? '' : 'none';
@@ -895,8 +890,6 @@ function renderSummaryFor(playerIdx) {
   const player = players[playerIdx];
   const cd = getCourseData(player);
   const isDetailed = player.mode === 'detailed';
-  // A score-only round logs 'Shot' placeholders, so there are no club names to list
-  const showClubs  = isDetailed && trackClubs;
   const ph = cd ? calcPlayingHCP(isDetailed ? hcp : player.hcp, cd, HOLES) : 0;
 
   let totalSF = 0, sfHoles = 0, adjGrossTotal = 0, total = 0, holesPlayed = 0;
@@ -906,13 +899,14 @@ function renderSummaryFor(playerIdx) {
     const grossCount = isDetailed ? shots.length : (player.round[i] || 0);
     if (grossCount) { total += grossCount; holesPlayed++; }
 
-    const pills = showClubs
-      ? (shots.length
-          ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
-          : '<span class="sum-none">No shots</span>')
-      : (grossCount
-          ? countPills(shots, grossCount)
-          : '<span class="sum-none">No shots</span>');
+    // Decided per hole, not by the mode currently selected: switching mid-round leaves
+    // a card where some holes carry club names and others only 'Shot' placeholders.
+    const hasClubs = isDetailed && shots.some(c => !NOT_A_CLUB.includes(c));
+    const pills = !grossCount
+      ? '<span class="sum-none">No shots</span>'
+      : hasClubs
+        ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
+        : countPills(shots, grossCount);
 
     let sfCol = '';
     if (cd && i < cd.holes.length) {
@@ -1274,29 +1268,54 @@ function buildCategoryOpts() {
   row.style.display = '';
 }
 
-// Clubs vs score-only. Both write the same token array per hole, so the choice only
-// changes what the pad logs and how it is displayed — never how anything is scored.
-function buildTrackOpts() {
-  const wrap = document.getElementById('trackOpts');
-  wrap.innerHTML = '';
-  [
-    { label: '⛳ Clubs & shots', val: true  },
-    { label: '🔢 Score only',    val: false }
-  ].forEach(({ label, val }) => {
+// ── TRACKING SHEET ──
+// Clubs vs score-only, asked once at the first tee rather than taking a box in the
+// lobby. Both modes write the same token array per hole, so the choice only changes
+// what the pad logs and how it is displayed — never how anything is scored.
+// The pair of mode buttons, shared by the first-tee sheet and the settings overlay so
+// the two can never drift. `afterPick` is what the host does once the choice is stored.
+function trackOptionButtons(afterPick) {
+  return [
+    { label: '⛳ Clubs & shots', val: true,  sub: 'A club for every shot' },
+    { label: '🔢 Score only',   val: false, sub: 'Just a total per hole' }
+  ].map(({ label, val, sub }) => {
     const btn = document.createElement('button');
+    // The current choice is highlighted, so dismissing the sheet keeps it
     btn.className = 'lobby-opt' + (trackClubs === val ? ' sel' : '');
-    btn.textContent = label;
+    btn.style.cssText = 'flex:1;padding:14px 10px';
+    btn.innerHTML = `<div style="font-size:15px">${label}</div>
+      <div style="font-size:11px;opacity:0.55;font-weight:400;line-height:1.35;margin-top:5px">${sub}</div>`;
     btn.addEventListener('click', () => {
       trackClubs = val;
       saveState();
-      buildTrackOpts();
+      afterPick();
     });
-    wrap.appendChild(btn);
+    return btn;
   });
-  document.getElementById('trackHint').textContent = trackClubs
-    ? 'Log the club behind every shot.'
-    : 'Just a total per hole, preselected at par. Putts and penalties optional.';
 }
+
+function buildTrackOpts() {
+  const wrap = document.getElementById('trackOpts');
+  wrap.innerHTML = '';
+  trackOptionButtons(() => {
+    closeTrackSheet();
+    buildClubButtons();
+    render();
+  }).forEach(btn => wrap.appendChild(btn));
+}
+
+function openTrackSheet() {
+  buildTrackOpts();
+  document.getElementById('trackSheet').style.display = '';
+  document.getElementById('trackBackdrop').style.display = '';
+}
+
+function closeTrackSheet() {
+  document.getElementById('trackSheet').style.display = 'none';
+  document.getElementById('trackBackdrop').style.display = 'none';
+}
+
+document.getElementById('trackBackdrop').addEventListener('click', closeTrackSheet);
 
 function buildStartOpts() {
   const startOpts = document.getElementById('startOpts');
@@ -1698,8 +1717,6 @@ function openLobby() {
     hcp = isNaN(v) ? DEFAULT_HCP : Math.min(54, Math.max(0, v));
   };
 
-  buildTrackOpts();
-
   buildPlayerLobby();
 
   updateLobbyStartBtn();
@@ -1740,17 +1757,38 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   getSimplePlayers().forEach(p => { p.round = Array(HOLES).fill(null); });
   hole  = 1;
   hideOverlay('lobbyOverlay');
-  document.getElementById('settingsBtn').classList.remove('locked');
   saveState();
   buildStrip();
   buildClubButtons();
   render();
+  // Asked at the first tee, where you actually know what kind of round this is.
+  // The pad behind it is already showing last round's mode, highlighted in the sheet.
+  openTrackSheet();
 });
 
 // ── SETTINGS ──
 function buildSettingsUI() {
   const scroll = document.getElementById('settingsScroll');
   scroll.innerHTML = '';
+
+  // Tracking mode, switchable at any point in the round: both modes store the same
+  // token array per hole, so flipping it never loses a score already logged.
+  const trackGroup = document.createElement('div');
+  trackGroup.className = 'settings-group';
+  trackGroup.innerHTML = `<div class="settings-group-title">Tracking</div>`;
+  const trackRow = document.createElement('div');
+  trackRow.style.cssText = 'display:flex;gap:10px';
+  // Re-rendering moves the highlight; closeSettings is what applies it to the pad
+  trackOptionButtons(buildSettingsUI).forEach(btn => trackRow.appendChild(btn));
+  trackGroup.appendChild(trackRow);
+  scroll.appendChild(trackGroup);
+
+  if (!trackClubs) {
+    const modeNote = document.createElement('div');
+    modeNote.className = 'settings-putter-note';
+    modeNote.innerHTML = `<span>🔢</span> Your bag isn't used while scoring by total`;
+    scroll.appendChild(modeNote);
+  }
 
   Object.entries(ALL_CLUBS).forEach(([groupName, clubs]) => {
     const group = document.createElement('div');
@@ -1789,6 +1827,10 @@ function buildSettingsUI() {
   note.className = 'settings-putter-note';
   note.innerHTML = `<span>⛳</span> Putter is always included`;
   scroll.appendChild(note);
+
+  // Mid-round the bag is being adjusted, not chosen before teeing off
+  document.getElementById('startRoundBtn').textContent =
+    roundStarted() ? 'Done' : 'Start Round →';
 }
 
 function closeSettings() {
@@ -1799,7 +1841,6 @@ function closeSettings() {
 }
 
 document.getElementById('settingsBtn').addEventListener('click', () => {
-  if (roundStarted()) return;
   buildSettingsUI();
   showOverlay('settingsOverlay');
 });
