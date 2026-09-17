@@ -8,37 +8,30 @@
 
 const COURSES = {
   'Golfclub St Genis': {
-    // Yellow starting tee
-    par: 74, sss: 68.4, slope: 114,
+    // Yellow starting tee. 9-hole course: par 37 over its nine holes, but sss 68.4 is an
+    // 18-hole-equivalent rating, so it is rated against an 18-hole par of 74.
+    par: 37, ratingPar: 74, sss: 68.4, slope: 114,
     holes: [
-      { par: 4, si: 1  },
-      { par: 5, si: 11 },
-      { par: 4, si: 13 },
-      { par: 3, si: 17 },
-      { par: 4, si: 15 },
-      { par: 4, si: 5  },
-      { par: 5, si: 3  },
-      { par: 3, si: 7  },
-      { par: 5, si: 9  },
-      { par: 4, si: 2  },
-      { par: 5, si: 12 },
-      { par: 4, si: 14 },
-      { par: 3, si: 18 },
-      { par: 4, si: 16 },
-      { par: 4, si: 6  },
-      { par: 5, si: 4  },
-      { par: 3, si: 8  },
-      { par: 5, si: 10 },
+      { par: 4, si: 1 },
+      { par: 5, si: 6 },
+      { par: 4, si: 7 },
+      { par: 3, si: 9 },
+      { par: 4, si: 8 },
+      { par: 4, si: 3 },
+      { par: 5, si: 2 },
+      { par: 3, si: 4 },
+      { par: 5, si: 5 },
     ]
   },
   'Golfclub St Genis - 5 Hole': {
-    par: 16, sss: null, slope: null,
+    // https://pages.ffgolf.org/tools/calculette?glfcod=0614&tercod=02&k=2462ec1091a0ecfd6403abd1e520cc34
+    par: 16, sss: 26.2, slope: 45,
     holes: [
-      { par: 3, si: null },
-      { par: 3, si: null },
-      { par: 4, si: null },
-      { par: 3, si: null },
-      { par: 3, si: null },
+      { par: 3, si: 1 },
+      { par: 3, si: 2 },
+      { par: 4, si: 3 },
+      { par: 3, si: 4 },
+      { par: 3, si: 5 },
     ]
   },
   'Ugolf Aravella Andorra': {
