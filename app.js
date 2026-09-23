@@ -1288,47 +1288,72 @@ document.getElementById('sumClose').addEventListener('click', function() {
 });
 
 // ── COPY ──
+const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+// Plain-text table with ' | ' between columns. Tabs pasted into chat and notes apps
+// collapse to spaces, and a row of bare numbers then gets detected as a phone number
+// and turned into a link — the pipes break those runs up.
+function textTable(rows) {
+  const widths = rows[0].map((_, c) => Math.max(...rows.map(r => String(r[c]).length)));
+  return rows.map(r => r.map((v, c) =>
+    c === r.length - 1 ? String(v) : String(v).padEnd(widths[c])
+  ).join(' | ').trimEnd()).join('\n');
+}
+function htmlTable(rows) {
+  const [head, ...body] = rows;
+  return `<table border="1" cellpadding="4" style="border-collapse:collapse">`
+    + `<tr>${head.map(h => `<th>${escHtml(h)}</th>`).join('')}</tr>`
+    + body.map(r => `<tr>${r.map(v => `<td>${escHtml(v)}</td>`).join('')}</tr>`).join('')
+    + `</table>`;
+}
+
 document.getElementById('copyBtn').addEventListener('click', () => {
   const header = [
     selectedCourse ? `Course: ${selectedCourse}` : null,
     `Holes: ${HOLES}`,
     hcp > 0 ? `HCP: ${hcp}` : null,
   ].filter(Boolean).join(' | ');
-  const rows = round.map((shots, i) => {
-    if (trackClubs) {
-      return `Hole ${i+1} (${shots.length} shots): ${shots.length ? shots.join(' → ') : '—'}`;
-    }
-    // Score-only: a run of identical 'Shot' tokens is noise — print the breakdown
-    const putts = shots.filter(c => c === 'Putter').length;
-    const pens  = shots.filter(c => c === 'Penalty').length;
-    const extra = [
-      putts ? `${putts} putt${putts === 1 ? '' : 's'}` : null,
-      pens  ? `${pens} penalt${pens === 1 ? 'y' : 'ies'}` : null
-    ].filter(Boolean).join(', ');
-    return `Hole ${i+1}: ${shots.length || '—'}${extra ? ` (${extra})` : ''}`;
-  }).join('\n');
 
-  // Scorecard table (Hole, Par, score per player) appended at the bottom. No player is
-  // passed because this only reads hole pars, which are shared across tees and categories.
-  const cd = getCourseData();
-  const cols = ['Hole', 'Par', ...players.map(p => p.name)];
-  const tableLines = [cols.join('\t')];
-  const totals = players.map(() => 0);
+  // Table 1 — your round shot by shot. Putts get their own column, so the clubs column
+  // lists everything else in the order played ('Shot' is a score-only placeholder).
+  const shotRows = [['Hole', 'Shots', 'Putts', 'Clubs used']];
+  let shotTotal = 0, puttTotal = 0;
+  round.forEach((shots, i) => {
+    const putts = shots.filter(c => c === 'Putter').length;
+    const clubs = shots.filter(c => c !== 'Putter' && c !== 'Shot');
+    shotTotal += shots.length; puttTotal += putts;
+    shotRows.push([i + 1, shots.length || '', shots.length ? putts : '', clubs.length ? clubs.join(' → ') : '']);
+  });
+  shotRows.push(['Total', shotTotal || '', puttTotal || '', '']);
+
+  // Table 2 — scorecard: shots and Stableford points for every player, side by side.
+  // Each player is scored off their own tee/handicap via the summary's data builder.
+  const cards = players.map((_, idx) => buildSummaryData(idx));
+  const cardRows = [['Hole', 'Par', ...players.flatMap((p, idx) =>
+    idx === 0 ? ['Shots', 'Stableford'] : [p.name, `${p.name} Stableford`])]];
   let parTotal = 0;
   for (let i = 0; i < HOLES; i++) {
-    const par = cd && i < cd.holes.length && cd.holes[i].par !== null ? cd.holes[i].par : '';
-    if (par !== '') parTotal += par;
-    const scores = players.map((p, pIdx) => {
-      const gross = p.mode === 'detailed' ? round[i].length : p.round[i];
-      if (gross) totals[pIdx] += gross;
-      return gross || '';
-    });
-    tableLines.push([i + 1, par, ...scores].join('\t'));
+    const par = cards[0].holes[i].par;
+    if (par !== null) parTotal += par;
+    cardRows.push([i + 1, par ?? '', ...cards.flatMap(c => {
+      const h = c.holes[i];
+      return [h.gross || '', h.pts ?? ''];
+    })]);
   }
-  tableLines.push(['Total', parTotal || '', ...totals.map(t => t || '')].join('\t'));
+  cardRows.push(['Total', parTotal || '', ...cards.flatMap(c =>
+    [c.total || '', c.sfHoles.length ? c.totalSF : ''])]);
 
-  const text = (header ? `${header}\n\n${rows}` : rows) + `\n\n${tableLines.join('\n')}`;
-  navigator.clipboard.writeText(text).then(() => {
+  const text = [header, textTable(shotRows), textTable(cardRows)].join('\n\n');
+  const html = `<p>${escHtml(header)}</p>${htmlTable(shotRows)}<br>${htmlTable(cardRows)}`;
+
+  // Rich copy where supported, so spreadsheets and notes apps paste real tables
+  const write = typeof ClipboardItem !== 'undefined' && navigator.clipboard.write
+    ? navigator.clipboard.write([new ClipboardItem({
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+        'text/html':  new Blob([html], { type: 'text/html' })
+      })]).catch(() => navigator.clipboard.writeText(text))
+    : navigator.clipboard.writeText(text);
+  write.then(() => {
     const b = document.getElementById('copyBtn');
     b.textContent = '✓ Copied to clipboard!';
     setTimeout(() => b.textContent = 'Copy to Clipboard', 2000);
