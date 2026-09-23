@@ -1308,11 +1308,13 @@ function htmlTable(rows) {
 }
 
 document.getElementById('copyBtn').addEventListener('click', () => {
+  // No "Label:" at the very start: iOS reads "Course: …" as a URL with a "course:"
+  // scheme, and Notes then pastes the whole export as a single percent-encoded link
   const header = [
-    selectedCourse ? `Course: ${selectedCourse}` : null,
-    `Holes: ${HOLES}`,
-    hcp > 0 ? `HCP: ${hcp}` : null,
-  ].filter(Boolean).join(' | ');
+    selectedCourse || null,
+    `${HOLES} holes`,
+    hcp > 0 ? `HCP ${hcp}` : null,
+  ].filter(Boolean).join(' · ');
 
   // Table 1 — your round shot by shot. Putts get their own column, so the clubs column
   // lists everything else in the order played ('Shot' is a score-only placeholder).
