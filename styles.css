@@ -376,7 +376,7 @@
   }
   .sum-sec-hint { font-size: 10px; color: rgba(255,255,255,0.3); font-style: italic; }
 
-  /* Club Hits: one tile per hole, coloured by score to par */
+  /* Hole grid, coloured by score to par */
   .hole-grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 6px;
   }
@@ -587,10 +587,7 @@
     font-size: 15px; font-weight: 600;
     padding: 13px 14px; width: 100%; outline: none;
   }
-  /* A native dropdown paints its popup list with the field's own background. Ours is
-     near-transparent, so the list came out cream-on-white and unreadable — the options
-     need an explicit opaque fill of their own. The caret is drawn here because
-     appearance:none removes the platform one. */
+  /* Opaque options so the native list is readable. Custom caret since appearance:none removes it. */
   select.lobby-custom-input {
     appearance: none; -webkit-appearance: none; cursor: pointer;
     background-color: rgba(255,255,255,0.05);

@@ -1,12 +1,6 @@
-// Golf Course Data
-// Add new courses here with each entry needing: par, sss, slope, and holes array (par + si per hole)
-// For 9-hole courses, add ratingPar with the 18-hole par those ratings were measured against.
-// sss and slope are always 18-hole-equivalent ratings, even for a 9-hole course.
-//
-// Ratings vary by tee and by player category; the card does not. A course may carry a
-// `tees` list of { colour, players, sss, slope } plus a `defaultTee`, in place of
-// top-level sss/slope. Hole pars and stroke indexes stay shared between all tees.
-// Entries with no `tees` keep using their top-level ratings, so both shapes work.
+// Golf course data. Each entry needs par, sss, slope and holes [{ par, si }].
+// sss/slope are 18-hole ratings, even on a 9-hole course. Add ratingPar when par isn't the 18-hole par.
+// A `tees` list [{ colour, players, sss, slope }] with a `defaultTee` can replace the top-level sss/slope.
 
 const COURSES = {
   'Golfclub St Genis': {
