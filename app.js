@@ -1763,7 +1763,11 @@ function buildHoleOpts(course) {
 function buildPlayerLobby() {
   const wrap = document.getElementById('playersLobby');
   wrap.innerHTML = '<div class="lobby-label">Playing Partners (optional)</div>';
+  buildPartnerRows(wrap, buildPlayerLobby);
+}
 
+// Partner rows with add/remove, used by the lobby and the settings overlay
+function buildPartnerRows(wrap, rebuild) {
   const cats    = categoriesFor();
   const colours = teeColoursFor();
   const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
@@ -1807,7 +1811,7 @@ function buildPlayerLobby() {
       round: Array(HOLES || 18).fill(null)
     });
     saveState();
-    buildPlayerLobby();
+    rebuild();
   });
   wrap.appendChild(addBtn);
 
@@ -1826,11 +1830,11 @@ function buildPlayerLobby() {
   // Bind remove
   wrap.querySelectorAll('.pill-x[data-pidx]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const simpleIdx = parseInt(btn.dataset.pidx);
-      const globalIdx = players.indexOf(getSimplePlayers()[simpleIdx]);
-      players.splice(globalIdx, 1);
+      const p = getSimplePlayers()[parseInt(btn.dataset.pidx)];
+      if (p.round.some(Boolean) && !confirm(`Remove ${p.name}? Their scores will be lost.`)) return;
+      players.splice(players.indexOf(p), 1);
       saveState();
-      buildPlayerLobby();
+      rebuild();
     });
   });
 }
@@ -1965,6 +1969,16 @@ function buildSettingsUI() {
     modeNote.innerHTML = `<span>🔢</span> Your bag isn't used while scoring by total`;
     scroll.appendChild(modeNote);
   }
+
+  const partnerGroup = document.createElement('div');
+  partnerGroup.className = 'settings-group';
+  const rebuildPartners = () => {
+    partnerGroup.innerHTML = '<div class="settings-group-title">Playing Partners</div>';
+    buildPartnerRows(partnerGroup, rebuildPartners);
+  };
+  rebuildPartners();
+
+  scroll.appendChild(partnerGroup);
 
   Object.entries(ALL_CLUBS).forEach(([groupName, clubs]) => {
     const group = document.createElement('div');
