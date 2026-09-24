@@ -22,65 +22,70 @@ Log the club behind every shot or just keep track of your score. One phone keeps
 - Or alternatively, to only track the totals per hole, with the **Score Only** option.
 
 **Follow a round from anywhere.** In the round summary, tap **Get a live code** to share the
-round. Anyone can enter the code (e.g. `GX7-42K`) on the [live view page](https://robert-rjm.github.io/Golf-Club-Tracker/view.html)
-to see the scorecard, Stableford points and clubs per hole, updating as the round is played.
+round. Anyone can enter the code (e.g. `GX7-42K`) under **📡 Follow a live round** in the app,
+or on the [live view page](https://robert-rjm.github.io/Golf-Club-Tracker/view.html), to see
+the scorecard, Stableford points and clubs per hole, updating as the round is played.
 Codes stop working 30 days after the last update, or straight away with **Stop sharing**.
 
-## Usage
+## Getting started
 
-For the best experience, add it to your home screen. Works also in any mobile browser.
+Open the [app](https://robert-rjm.github.io/Golf-Club-Tracker/) on your phone. It works in any
+mobile browser, but it's nicer added to your home screen, where it opens full screen like an app:
 
-1. Open the [live app](https://robert-rjm.github.io/Golf-Club-Tracker/) in your browser
-2. Tap **Share → Add to Home Screen**
-3. Opens as a standalone app with no browser chrome
+- **iPhone (Safari):** tap **Share → Add to Home Screen**
+- **Android (Chrome):** tap **⋮ → Add to Home screen** (or **Install app**)
 
-## Live sharing setup
+To play a round, pick your course, the number of holes, your tee and your handicap. On the next
+screen, add any playing partners and tap **Start Round**.
 
-Live codes need a free [Supabase](https://supabase.com) project. Without one the app works as
-before and the Live Share section stays hidden.
+Your rounds are saved on your phone only. Clearing your browser's data for the site deletes them.
 
-1. Create a Supabase project
-2. In **SQL Editor**, run [`supabase.sql`](supabase.sql)
-3. From **Project Settings → API**, copy the project URL and the publishable (anon) key into
-   `SUPABASE_URL` and `SUPABASE_KEY` at the top of [`share.js`](share.js)
+## Courses
 
-The key is safe to publish: the rounds table can only be reached through the functions in
-`supabase.sql`, and only the phone that created a code can update or delete it.
+These courses are built in, with the par, stroke index and ratings for every tee, so Stableford
+works straight away:
 
-Courses saved in the app's course editor are also sent to the same project. The app can only add
-them, not read them: find them in **Table Editor → course_submissions** and paste the `snippet`
-column into `courses.js`.
+| Course | Holes | Par |
+|--------|-------|-----|
+| Golfclub St Genis | 9 · 18 | 37 (9 holes) |
+| Golfclub St Genis, 5-hole course | 5 | 16 |
+| Ugolf Aravella Andorra | 9 · 18 | 71 |
+| Grandvalira Golf Soldeu | 9 · 18 | 33 (9 holes) |
+| Verbier Les Esserts | 9 · 18 | 69 |
 
-## Supported Courses
+To play the 5-hole course, pick **Golfclub St Genis**, then **5 holes**. Choosing 18 holes on
+a 9-hole course plays the nine twice.
 
-Course data (par, stroke index, and SSS/slope per tee) is stored in `courses.js`. Currently includes:
+### Playing somewhere else
 
-| Course | Holes | Par | Stableford |
-|--------|-------|-----|------------|
-| Golfclub St Genis | 9 · 18 | 37 (9 holes) | ✅ |
-| Golfclub St Genis — 5 Hole | 5 | 16 | ✅ |
-| Ugolf Aravella Andorra | 9 · 18 | 71 | ✅ |
-| Grandvalira Golf Soldeu | 9 · 18 | 33 (9 holes) | ✅ |
-| Others (custom) | 5 · 9 · 18 | you set each hole | only if you enter SSS & slope |
+Type the course name into the search box in the lobby, then choose:
 
-> The 5-hole course is reached by selecting **Golfclub St Genis**, then **5 holes**. Picking
-> 18 on a 9-hole course plays that nine twice.
+- **Play "…" without saving** for a one-off round of 9 or 18 holes. You can set the par for
+  each hole if you like.
+- **＋ Save "…" as a course** to keep the course on your phone for next time. Enter the par
+  and stroke index for each hole from the scorecard. To change it later, tap **✎ Edit** under
+  the course buttons.
 
-> Stableford needs SSS and Slope to work out your playing handicap. Every built-in course
-> has them for each tee; a custom course can still track shots and scores without them,
-> just without points.
+For Stableford points, the app also needs the course's **Course Rating** (also called SSS) and
+**Slope** for your tee. You'll find them on the scorecard or the club's website. Without them
+you can still keep shots and scores, just without points.
 
-### Want your course added?
+> On a 9-hole course the scorecard usually shows 18-hole ratings (for example 66.4 and 110).
+> Enter those as they are. The app works out the 9-hole figures itself.
 
-Directly from the app, select **Others**: enter your course name, set the hole count, and tap **Suggest this course for the app** button. This will open a pre-filled GitHub issue, alternatively open an issue directly on GitHub.
+### Want your course added for everyone?
 
-**Open an Issue:**
+Save it with **＋ Save "…" as a course**, as above. That also sends it in to be added to the
+app, so there's nothing else to do. If you enter the ratings, say in the note where they came
+from (a link to the scorecard is perfect) so they can be checked.
 
-1. Go to [Issues](../../issues) → **New Issue**
-2. Title it `Course Request: [Course Name]`
-3. Include: course name, number of holes, total par, par/SI for each hole, and the SSS
-   and slope **along with which tee they were measured from** — ratings differ per tee,
-   and for men and ladies
+You can also [open an issue](../../issues/new) titled `Course suggestion: [Course Name]`. Include
+the par and stroke index of each hole, and the rating and slope for each tee, for men and ladies.
+
+## Running your own copy
+
+The app is a handful of static files with no build step. For the file layout, setting up live
+sharing with Supabase, and adding courses to the code, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## License
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
