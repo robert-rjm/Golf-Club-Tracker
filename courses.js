@@ -136,7 +136,39 @@ const COURSES = {
       { par: 4, si: 7 },
       { par: 3, si: 11 },
     ]
-  }
+  },
+    'Chamonix': {
+    // https://www.golfdechamonix.com/en/introduction
+    par: 72,
+    defaultTee: 'Yellow',
+    tees: [
+      { colour: 'Black', sss: 72.8, slope: 139 },
+      { colour: 'White', sss: 71.4, slope: 134 },
+      { colour: 'Yellow', sss: 69.5, slope: 131 },
+      { colour: 'Blue', sss: 72.2, slope: 129 },
+      { colour: 'Red', sss: 70.6, slope: 127 },
+    ],
+    holes: [
+      { par: 4, si: 3 },
+      { par: 4, si: 9 },
+      { par: 3, si: 15 },
+      { par: 4, si: 11 },
+      { par: 5, si: 13 },
+      { par: 5, si: 7 },
+      { par: 4, si: 1 },
+      { par: 3, si: 17 },
+      { par: 4, si: 5 },
+      { par: 4, si: 6 },
+      { par: 3, si: 16 },
+      { par: 5, si: 12 },
+      { par: 3, si: 18 },
+      { par: 5, si: 4 },
+      { par: 4, si: 8 },
+      { par: 4, si: 2 },
+      { par: 5, si: 10 },
+      { par: 3, si: 14 },
+    ]
+  },
 };
 
 // Courses offered in the lobby. The first few are the buttons until there's play history,
