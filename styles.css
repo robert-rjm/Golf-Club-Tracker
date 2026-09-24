@@ -536,6 +536,7 @@
     align-items: center; margin-top: 8px;
   }
   .friend-grid select { padding: 8px 30px 8px 10px; }
+  .friend-grid input { padding: 8px 10px; }
   .friend-lbl { font-size: 11px; color: var(--cream-dim); }
 
   /* ── SETTINGS ── */
