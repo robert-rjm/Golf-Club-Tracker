@@ -7,16 +7,18 @@
 <link rel="icon" href="Logo.png">
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="landing">
 <div class="view-wrap">
   <div class="view-top">
-    <a class="view-brand" href="index.html">⛳ ClubTrack</a>
+    <a class="view-brand" href="index.html"><img class="logo-icon" src="Logo-transparent.png" alt="">ClubTrack</a>
+    <div class="view-intro">Follow a live round</div>
     <form class="view-form" id="codeForm">
-      <input class="lobby-custom-input" id="codeInput" placeholder="Round code, e.g. GX7-42K" autocomplete="off" autocapitalize="characters" maxlength="8">
+      <input class="lobby-custom-input" id="codeInput" placeholder="XXX-XXX" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="7">
       <button class="share-btn" type="submit">Show</button>
     </form>
+    <div class="view-status" id="viewStatus"></div>
+    <div class="view-intro-hint">The code is under Round Summary → Live Share on the phone</div>
   </div>
-  <div class="view-status" id="viewStatus"></div>
   <div id="viewRound"></div>
 </div>
 

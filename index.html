@@ -14,7 +14,7 @@
 <div class="app">
 
   <div class="header">
-    <div class="logo">⛳ ClubTrack</div>
+    <div class="logo"><img class="logo-icon" src="Logo-transparent.png" alt="">ClubTrack</div>
     <div class="hole-nav">
       <button class="nav-btn" id="prev">‹</button>
       <div class="hole-display">
@@ -70,17 +70,17 @@
 <!-- Lobby overlay -->
 <div class="overlay" id="lobbyOverlay">
   <div class="lobby-logo">
-    <!-- To add your own logo: set src="Logo.png" (place the file alongside index.html) -->
-    <img class="lobby-logo-img" id="lobbyLogoImg" src="" alt="">
-    <div class="lobby-brand">⛳ ClubTrack</div>
+    <div class="lobby-brand"><img class="lobby-logo-img" src="Logo-transparent.png" alt="">ClubTrack</div>
     <div class="lobby-tagline">Track every club. Every hole.</div>
   </div>
   <div class="lobby-scroll">
     <button class="restore-btn" id="restoreBtn" style="display:none"></button>
+    <a class="follow-btn" id="followLobbyBtn" href="view.html?app=1" style="display:none">📡 Follow a live round</a>
     <div class="lobby-section">
       <div class="lobby-label">Course</div>
       <div class="lobby-opts" id="courseOpts"></div>
-      <input type="text" class="lobby-custom-input" id="customCourse" placeholder="Enter course name…" style="display:none">
+      <input type="search" class="lobby-custom-input" id="courseSearch" placeholder="Search courses or type a new one…" autocomplete="off" enterkeyhint="go">
+      <div class="course-results" id="courseResults" style="display:none"></div>
       <div class="course-tools" id="courseTools"></div>
     </div>
     <div class="lobby-section">
@@ -130,7 +130,7 @@
   <div class="ov-player-switch" id="ovPlayerSwitch"></div>
   <div class="ov-body" id="ovBody">
     <div class="sum-section">
-      <div class="sum-sec-head"><span class="lobby-label">⛳ Club Hits</span><span class="sum-sec-hint">tap a hole for clubs</span></div>
+      <div class="sum-sec-head"><span class="lobby-label"><img class="logo-icon" src="Logo-transparent.png" alt="">Club Hits</span><span class="sum-sec-hint">tap a hole for clubs</span></div>
       <div class="hole-grid" id="ovHoles"></div>
     </div>
     <div class="sum-section" id="ovStatsSection">
@@ -177,6 +177,16 @@
 
 <script src="courses.js"></script>
 <script src="share.js"></script>
-<script src="app.js"></script>
+<!-- One global scope, so order matters: each file only runs code that uses the ones above it -->
+<script src="js/state.js"></script>
+<script src="js/scoring.js"></script>
+<script src="js/round.js"></script>
+<script src="js/summary.js"></script>
+<script src="js/live-share.js"></script>
+<script src="js/players.js"></script>
+<script src="js/lobby.js"></script>
+<script src="js/course-editor.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

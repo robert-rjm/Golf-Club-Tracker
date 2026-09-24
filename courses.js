@@ -139,5 +139,6 @@ const COURSES = {
   }
 };
 
-// Names shown as buttons in the lobby (last entry should always be 'Others')
+// Courses offered in the lobby. The first few are the buttons until there's play history,
+// the rest are found by search. Last entry should always be 'Others'.
 const PRESET_COURSES = ['Golfclub St Genis', 'Verbier Les Esserts', 'Ugolf Aravella Andorra', 'Grandvalira Golf Soldeu', 'Others'];
