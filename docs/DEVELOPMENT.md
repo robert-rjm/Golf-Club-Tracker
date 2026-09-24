@@ -37,6 +37,7 @@ is no account or server copy. The only network calls are the optional Supabase o
 | `share.js` | Supabase connection details and helpers, shared by the app and the live view |
 | `supabase.sql` | Tables and functions for the Supabase project |
 | `view.html` · `view.js` | Read-only live view of a shared round, opened with a code |
+| `courses.html` | Public list of the built-in courses and their tees, read from `courses.js`. The README links to it, so it never needs editing |
 | `Logo.png` | Solid-background logo: browser-tab and home-screen icon, README header. iOS fills a transparent home-screen icon with black, and GitHub's light theme would hide the white ball |
 | `Logo-transparent.png` | Transparent logo used inside the app (lobby, header, labels) and the live view |
 | `js/` | The app's code, split by screen (below) |
@@ -82,7 +83,7 @@ setting there too, or restoring the last round will lose it.
 Both need a free [Supabase](https://supabase.com) project. `share.js` ships with this
 project's own URL and key filled in, so a copy has to replace them or empty them. With either
 one empty, the app works as normal and hides the Live Share section, the
-**📡 Follow a live round** button and course submissions.
+**📡 Follow a round** button and course submissions.
 
 ### Setting up a project
 
