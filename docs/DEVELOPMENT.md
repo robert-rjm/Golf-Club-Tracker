@@ -37,6 +37,8 @@ is no account or server copy. The only network calls are the optional Supabase o
 | `share.js` | Supabase connection details and helpers, shared by the app and the live view |
 | `supabase.sql` | Tables and functions for the Supabase project |
 | `view.html` · `view.js` | Read-only live view of a shared round, opened with a code |
+| `Logo.png` | Solid-background logo: browser-tab and home-screen icon, README header. iOS fills a transparent home-screen icon with black, and GitHub's light theme would hide the white ball |
+| `Logo-transparent.png` | Transparent logo used inside the app (lobby, header, labels) and the live view |
 | `js/` | The app's code, split by screen (below) |
 
 ### `js/`
