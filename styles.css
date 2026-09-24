@@ -510,6 +510,22 @@
   }
   .new-round-btn:active { background: rgba(176,48,32,0.28); }
 
+  /* Saved friends */
+  .friend-star {
+    background: none; border: none; cursor: pointer;
+    color: rgba(255,255,255,0.3); font-size: 20px; line-height: 1; padding: 0 2px;
+  }
+  .friend-star.on { color: var(--gold); }
+  .friend-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .friend-chip {
+    background: rgba(201,168,76,0.08); border: 1px solid var(--border-gold);
+    border-radius: 16px; color: var(--cream);
+    font-family: 'Karla', sans-serif; font-size: 13px; font-weight: 700;
+    padding: 7px 12px; cursor: pointer;
+  }
+  .friend-chip small { color: var(--gold); font-weight: 600; margin-left: 2px; }
+  .friend-chip:active { transform: scale(0.95); }
+
   /* ── SETTINGS ── */
   .settings-scroll { flex: 1; overflow-y: auto; scrollbar-width: none; }
   .settings-scroll::-webkit-scrollbar { display: none; }

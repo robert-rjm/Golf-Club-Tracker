@@ -1932,6 +1932,45 @@ function buildHoleOpts(course) {
   buildPlayerLobby();
 }
 
+// ── FRIENDS ──
+// Saved partners: handicap, category and the tee they play off at each course
+let friends = [];
+try { friends = JSON.parse(localStorage.getItem('gct_friends')) || []; } catch (e) {}
+function saveFriends() {
+  localStorage.setItem('gct_friends', JSON.stringify(friends));
+}
+const sameName = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+function friendFor(p) {
+  return friends.find(f => sameName(f.name, p.name));
+}
+
+function rememberFriend(p) {
+  let f = friendFor(p);
+  if (!f) {
+    f = { name: p.name.trim(), tees: {} };
+    friends.push(f);
+  }
+  f.hcp = p.hcp;
+  f.category = p.category;
+  // Only touch the tee where there was a choice to make
+  if (selectedCourse && teeColoursFor().length > 1) {
+    if (p.tee) f.tees[selectedCourse] = p.tee;
+    else delete f.tees[selectedCourse];
+  }
+  saveFriends();
+}
+
+function addFriendAsPartner(f) {
+  players.push({
+    name: f.name,
+    hcp: f.hcp,
+    mode: 'simple',
+    tee: null, // set from f.tees when the rows are built
+    category: f.category || DEFAULT_CATEGORY,
+    round: Array(HOLES || 18).fill(null)
+  });
+}
+
 function buildPlayerLobby() {
   const wrap = document.getElementById('playersLobby');
   wrap.innerHTML = '<div class="lobby-label">Playing Partners (optional)</div>';
@@ -1944,8 +1983,14 @@ function buildPartnerRows(wrap, rebuild) {
   const colours = teeColoursFor();
   const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
   getSimplePlayers().forEach((p, i) => {
-    // Tee from another course or hole count
-    if (p.tee && !colours.includes(p.tee)) p.tee = null;
+    // A saved friend plays off their own tee for this course
+    const friend = friendFor(p);
+    if (friend) {
+      const t = friend.tees[selectedCourse];
+      p.tee = colours.includes(t) ? t : null;
+    } else if (p.tee && !colours.includes(p.tee)) {
+      p.tee = null; // tee from another course or hole count
+    }
     if (!p.category) p.category = DEFAULT_CATEGORY;
     const teeField = colours.length < 2 ? '' : `
       <select class="lobby-custom-input" style="flex:1;padding:10px 30px 10px 10px" data-pidx="${i}" data-field="tee">
@@ -1964,6 +2009,7 @@ function buildPartnerRows(wrap, rebuild) {
       <div style="display:flex;gap:8px;align-items:center">
         <input class="lobby-custom-input" style="flex:2;padding:10px" value="${p.name}" placeholder="Name" data-pidx="${i}" data-field="name">
         <input class="lobby-custom-input" style="flex:1;padding:10px" type="number" value="${p.hcp}" placeholder="HCP" data-pidx="${i}" data-field="hcp">
+        <button class="friend-star${friend ? ' on' : ''}" data-star="${i}" title="Save as friend">${friend ? '★' : '☆'}</button>
         <button class="pill-x" style="font-size:18px" data-pidx="${i}">✕</button>
       </div>${extras}
     `;
@@ -1987,6 +2033,23 @@ function buildPartnerRows(wrap, rebuild) {
   });
   wrap.appendChild(addBtn);
 
+  const available = friends.filter(f => !getSimplePlayers().some(p => sameName(p.name, f.name)));
+  if (available.length) {
+    const chips = document.createElement('div');
+    chips.className = 'friend-chips';
+    chips.innerHTML = available.map(f =>
+      `<button class="friend-chip" data-friend="${friends.indexOf(f)}">+ ${escHtml(f.name)} <small>${f.hcp}</small></button>`
+    ).join('');
+    chips.addEventListener('click', e => {
+      const chip = e.target.closest('[data-friend]');
+      if (!chip) return;
+      addFriendAsPartner(friends[+chip.dataset.friend]);
+      saveState();
+      rebuild();
+    });
+    wrap.appendChild(chips);
+  }
+
   // Category picker is a <select>
   wrap.querySelectorAll('[data-field]').forEach(inp => {
     inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', () => {
@@ -1995,7 +2058,30 @@ function buildPartnerRows(wrap, rebuild) {
       if (inp.dataset.field === 'hcp')      p.hcp = Math.min(54, Math.max(0, parseInt(inp.value) || 0));
       if (inp.dataset.field === 'category') p.category = inp.value || DEFAULT_CATEGORY;
       if (inp.dataset.field === 'tee')      p.tee = inp.value || null;
+      if (inp.dataset.field === 'name') {
+        const star = wrap.querySelector(`[data-star="${inp.dataset.pidx}"]`);
+        const saved = Boolean(friendFor(p));
+        star.classList.toggle('on', saved);
+        star.textContent = saved ? '★' : '☆';
+      } else if (friendFor(p)) {
+        rememberFriend(p);
+      }
       saveState();
+    });
+  });
+
+  wrap.querySelectorAll('[data-star]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = getSimplePlayers()[+btn.dataset.star];
+      if (!p.name.trim()) return;
+      const f = friendFor(p);
+      if (f) {
+        friends.splice(friends.indexOf(f), 1);
+        saveFriends();
+      } else {
+        rememberFriend(p);
+      }
+      rebuild();
     });
   });
 
