@@ -230,27 +230,27 @@ function buildSubmitBtn() {
   const hasPars = customHolePars.some(p => p !== null);
   if (!hasName || !hasPars) { wrap.style.display = 'none'; return; }
 
+  const n = customHolePars.length;
+  const allPars = customHolePars.every(p => p !== null);
   const totalPar = customHolePars.reduce((s, p) => s + (p || 0), 0);
-  const holesSnippet = customHolePars
-    .map((p, i) => `      { par: ${p ?? '?'}, si: null }`)
-    .join(',\n');
+  // Only a full set of pars makes a valid courses.js entry. The ratings are 18-hole
+  // values, so a shorter course needs an 18-hole ratingPar, as in buildCourseData.
+  let snippet = '';
+  if (allPars) {
+    const entry = { par: totalPar, sss: customSSS, slope: customSlope,
+      holes: customHolePars.map(par => ({ par, si: null })) };
+    if (n !== 18) entry.ratingPar = totalPar * 18 / n;
+    snippet = `\n\n\`\`\`js\n${courseSnippet(selectedCourse, entry)}\n\`\`\``;
+  }
   const body =
 `### New course suggestion
 
 **Course name:** ${selectedCourse}
-**Holes:** ${customHolePars.length}
-**Total par:** ${totalPar}
+**Holes:** ${n}
+**Pars:** ${customHolePars.map(p => p ?? '?').join(', ')}${allPars ? ` (total ${totalPar})` : ''}
+**Stroke index:** unknown
 **SSS:** ${customSSS ?? 'unknown'}
-**Slope:** ${customSlope ?? 'unknown'}
-
-\`\`\`js
-'${selectedCourse}': {
-  par: ${totalPar}, sss: ${customSSS ?? null}, slope: ${customSlope ?? null},
-  holes: [
-${holesSnippet}
-  ]
-}
-\`\`\``;
+**Slope:** ${customSlope ?? 'unknown'}${snippet}`;
 
   const url = `https://github.com/${GITHUB_REPO}/issues/new?`
     + `title=${encodeURIComponent(`Course suggestion: ${selectedCourse}`)}`
