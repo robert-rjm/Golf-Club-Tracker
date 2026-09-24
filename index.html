@@ -179,6 +179,16 @@
 
 <script src="courses.js"></script>
 <script src="share.js"></script>
-<script src="app.js"></script>
+<!-- One global scope, so order matters: each file only runs code that uses the ones above it -->
+<script src="js/state.js"></script>
+<script src="js/scoring.js"></script>
+<script src="js/round.js"></script>
+<script src="js/summary.js"></script>
+<script src="js/live-share.js"></script>
+<script src="js/players.js"></script>
+<script src="js/lobby.js"></script>
+<script src="js/course-editor.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>
