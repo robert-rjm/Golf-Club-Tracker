@@ -814,6 +814,14 @@
     padding: 9px 12px; cursor: pointer;
   }
   .course-tool-btn:active { background: rgba(201,168,76,0.12); color: var(--gold); }
+  .course-submit-status { width: 100%; font-size: 12px; line-height: 1.4; color: var(--cream-dim); }
+  .course-submit-status.sent { color: var(--turf); }
+  .course-submit-status.failed { color: #e07a6a; }
+  .course-submit-retry {
+    margin-left: 8px; background: none; border: none; padding: 0;
+    color: var(--gold); font-family: 'Karla', sans-serif; font-size: 12px; font-weight: 700;
+    text-decoration: underline; cursor: pointer;
+  }
   .ce-small { font-size: 13px; padding: 10px 12px; }
   .ce-count { flex: 1; min-width: 0; padding: 10px 12px; text-align: center; }
   .ce-hint { font-size: 12px; line-height: 1.4; color: rgba(255,255,255,0.4); }

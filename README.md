@@ -76,8 +76,9 @@ you can still keep shots and scores, just without points.
 ### Want your course added for everyone?
 
 Save it with **＋ Save "…" as a course**, as above. That also sends it in to be added to the
-app, so there's nothing else to do. If you enter the ratings, say in the note where they came
-from (a link to the scorecard is perfect) so they can be checked.
+app: **✓ sent for review** under the course buttons means it arrived. If it couldn't be sent
+(no signal, for example), tap **Try again**. If you enter the ratings, say in the note where they
+came from (a link to the scorecard is perfect) so they can be checked.
 
 You can also [open an issue](../../issues/new) titled `Course suggestion: [Course Name]`. Include
 the par and stroke index of each hole, and the rating and slope for each tee, for men and ladies.

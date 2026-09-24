@@ -597,6 +597,7 @@ function buildCourseTools() {
       btn.addEventListener('click', () => openCourseEditor(k));
       wrap.appendChild(btn);
     });
+  buildSubmissionStatus(wrap);
 }
 
 function updateLobbyStartBtn() {

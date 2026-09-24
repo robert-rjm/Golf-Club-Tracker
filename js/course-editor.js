@@ -278,6 +278,39 @@ function copyCourseSnippet() {
   }, () => { err.textContent = 'Could not copy to the clipboard.'; });
 }
 
+// ── COURSE SUBMISSION ──
+// The latest save's submission, shown under the course buttons: { name, entry, state }.
+// submit_course returns false when the hourly limit is reached, so that counts as failed too.
+let courseSubmission = null;
+
+function submitCourse(name, entry) {
+  const sub = { name, entry, state: 'sending' };
+  courseSubmission = sub;
+  supabaseRpc('submit_course', { p_name: name, p_snippet: courseSnippet(name, entry), p_data: entry })
+    .then(ok => { sub.state = ok ? 'sent' : 'failed'; }, () => { sub.state = 'failed'; })
+    .then(() => { if (courseSubmission === sub) buildCourseTools(); });
+}
+
+function buildSubmissionStatus(wrap) {
+  const sub = courseSubmission;
+  if (!sub) return;
+  const status = document.createElement('div');
+  status.className = 'course-submit-status ' + sub.state;
+  status.textContent = {
+    sending: `Sending "${sub.name}" for review…`,
+    sent:    `✓ "${sub.name}" sent for review`,
+    failed:  `Couldn't send "${sub.name}" for review. It's saved on your phone, so you can try again later.`
+  }[sub.state];
+  if (sub.state === 'failed') {
+    const retry = document.createElement('button');
+    retry.className = 'course-submit-retry';
+    retry.textContent = 'Try again';
+    retry.addEventListener('click', () => { submitCourse(sub.name, sub.entry); buildCourseTools(); });
+    status.appendChild(retry);
+  }
+  wrap.appendChild(status);
+}
+
 document.getElementById('courseEditSave').addEventListener('click', () => {
   const err = document.getElementById('courseEditError');
   let name, entry;
@@ -288,10 +321,7 @@ document.getElementById('courseEditSave').addEventListener('click', () => {
   userCourses[name] = entry;
   saveUserCourses();
   // Also sent to Supabase to be added to courses.js. The local copy works either way.
-  if (shareEnabled()) {
-    supabaseRpc('submit_course', { p_name: name, p_snippet: courseSnippet(name, entry), p_data: entry })
-      .catch(() => {});
-  }
+  if (shareEnabled()) submitCourse(name, entry);
   // Select the saved course, keeping the hole choice where it still fits
   const base = name.replace(/\s*-\s*\d+\s*Hole$/i, '');
   if (!courseDraftKey || selectedCourse === oldBase || isCustomCourse(selectedCourse)) {
