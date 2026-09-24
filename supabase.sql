@@ -61,3 +61,37 @@ revoke all on function public.unshare_round(text, text) from public;
 grant execute on function public.share_round(text, text, jsonb) to anon, authenticated;
 grant execute on function public.get_round(text) to anon, authenticated;
 grant execute on function public.unshare_round(text, text) to anon, authenticated;
+
+-- Courses saved in the app's course editor, sent here to be added to courses.js.
+-- The app can only add rows. Read them in Table Editor → course_submissions and paste `snippet`.
+create table if not exists public.course_submissions (
+  id         bigint generated always as identity primary key,
+  name       text not null,
+  snippet    text not null,
+  data       jsonb not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.course_submissions enable row level security;
+revoke all on public.course_submissions from anon, authenticated;
+
+create or replace function public.submit_course(p_name text, p_snippet text, p_data jsonb)
+returns boolean
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if length(p_name) not between 1 and 100 or length(p_snippet) > 20000
+     or pg_column_size(p_data) > 20000 then
+    return false;
+  end if;
+  -- Crude flood guard, since the key is public
+  if (select count(*) from course_submissions where created_at > now() - interval '1 hour') >= 50 then
+    return false;
+  end if;
+
+  insert into course_submissions (name, snippet, data) values (p_name, p_snippet, p_data);
+  return true;
+end $$;
+
+revoke all on function public.submit_course(text, text, jsonb) from public;
+grant execute on function public.submit_course(text, text, jsonb) to anon, authenticated;

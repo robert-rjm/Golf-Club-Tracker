@@ -8,6 +8,33 @@ const ALL_CLUBS = {
 // Logged as strokes but not clubs. 'Shot' is the score-only placeholder.
 const NOT_A_CLUB = ['Putter', 'Penalty', 'Shot'];
 
+// ── SAVED COURSES ──
+// Courses added in the course editor live in localStorage and are merged into COURSES.
+// A courses.js entry with the same name wins.
+const BUILTIN_COURSES = Object.keys(COURSES);
+const BUILTIN_PRESETS = PRESET_COURSES.filter(n => n !== 'Others');
+let userCourses = {};
+try { userCourses = JSON.parse(localStorage.getItem('gct_usercourses')) || {}; } catch (e) {}
+
+function applyUserCourses() {
+  Object.keys(COURSES).forEach(k => { if (!BUILTIN_COURSES.includes(k)) delete COURSES[k]; });
+  const names = [];
+  Object.keys(userCourses).forEach(k => {
+    if (BUILTIN_COURSES.includes(k)) return;
+    COURSES[k] = userCourses[k];
+    const base = k.replace(/\s*-\s*\d+\s*Hole$/i, '');
+    if (!BUILTIN_PRESETS.includes(base) && !names.includes(base)) names.push(base);
+  });
+  PRESET_COURSES.splice(0, PRESET_COURSES.length, ...BUILTIN_PRESETS, ...names, 'Others');
+}
+
+function saveUserCourses() {
+  localStorage.setItem('gct_usercourses', JSON.stringify(userCourses));
+  applyUserCourses();
+}
+
+applyUserCourses();
+
 function withSecondRound(courseObj) {
   if (!secondRound) return courseObj;
   // Only the holes double. The ratings stay 18-hole values, calcPlayingHCP scales them.
@@ -1932,6 +1959,51 @@ function buildHoleOpts(course) {
   buildPlayerLobby();
 }
 
+// ── FRIENDS ──
+// Partners with a real name are saved as friends: handicap, category and the tee they
+// play off at each course. Managed under ⚙ → Friends.
+let friends = [];
+try { friends = JSON.parse(localStorage.getItem('gct_friends')) || []; } catch (e) {}
+function saveFriends() {
+  localStorage.setItem('gct_friends', JSON.stringify(friends));
+}
+const sameName = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+// Blank or the "Player 2" placeholder from + Add player
+const isPlaceholderName = name => !String(name).trim() || /^player \d+$/i.test(String(name).trim());
+function friendFor(p) {
+  return isPlaceholderName(p.name) ? null : friends.find(f => sameName(f.name, p.name));
+}
+
+function rememberFriend(p) {
+  if (isPlaceholderName(p.name)) return;
+  let f = friendFor(p);
+  if (!f) {
+    f = { name: p.name.trim(), tees: {} };
+    friends.push(f);
+  }
+  f.hcp = p.hcp;
+  f.category = p.category;
+  // Only touch the tee where there was a choice to make
+  if (selectedCourse && teeColoursFor().length > 1) {
+    if (p.tee) f.tees[selectedCourse] = p.tee;
+    else delete f.tees[selectedCourse];
+  }
+  saveFriends();
+}
+
+// The tee is applied from f.tees when the rows are built
+function applyFriend(p, f) {
+  p.name = f.name;
+  p.hcp = f.hcp;
+  p.category = f.category || DEFAULT_CATEGORY;
+}
+
+function addFriendAsPartner(f) {
+  const p = { mode: 'simple', tee: null, round: Array(HOLES || 18).fill(null) };
+  applyFriend(p, f);
+  players.push(p);
+}
+
 function buildPlayerLobby() {
   const wrap = document.getElementById('playersLobby');
   wrap.innerHTML = '<div class="lobby-label">Playing Partners (optional)</div>';
@@ -1944,8 +2016,14 @@ function buildPartnerRows(wrap, rebuild) {
   const colours = teeColoursFor();
   const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
   getSimplePlayers().forEach((p, i) => {
-    // Tee from another course or hole count
-    if (p.tee && !colours.includes(p.tee)) p.tee = null;
+    // A saved friend plays off their own tee for this course
+    const friend = friendFor(p);
+    if (friend) {
+      const t = friend.tees[selectedCourse];
+      p.tee = colours.includes(t) ? t : null;
+    } else if (p.tee && !colours.includes(p.tee)) {
+      p.tee = null; // tee from another course or hole count
+    }
     if (!p.category) p.category = DEFAULT_CATEGORY;
     const teeField = colours.length < 2 ? '' : `
       <select class="lobby-custom-input" style="flex:1;padding:10px 30px 10px 10px" data-pidx="${i}" data-field="tee">
@@ -1962,7 +2040,7 @@ function buildPartnerRows(wrap, rebuild) {
     row.style.cssText = 'margin:10px 0';
     row.innerHTML = `
       <div style="display:flex;gap:8px;align-items:center">
-        <input class="lobby-custom-input" style="flex:2;padding:10px" value="${p.name}" placeholder="Name" data-pidx="${i}" data-field="name">
+        <input class="lobby-custom-input" style="flex:2;padding:10px" value="${escHtml(p.name)}" placeholder="Name" data-pidx="${i}" data-field="name">
         <input class="lobby-custom-input" style="flex:1;padding:10px" type="number" value="${p.hcp}" placeholder="HCP" data-pidx="${i}" data-field="hcp">
         <button class="pill-x" style="font-size:18px" data-pidx="${i}">✕</button>
       </div>${extras}
@@ -1987,6 +2065,23 @@ function buildPartnerRows(wrap, rebuild) {
   });
   wrap.appendChild(addBtn);
 
+  const available = friends.filter(f => !getSimplePlayers().some(p => sameName(p.name, f.name)));
+  if (available.length) {
+    const chips = document.createElement('div');
+    chips.className = 'friend-chips';
+    chips.innerHTML = available.map(f =>
+      `<button class="friend-chip" data-friend="${friends.indexOf(f)}">+ ${escHtml(f.name)} <small>${f.hcp}</small></button>`
+    ).join('');
+    chips.addEventListener('click', e => {
+      const chip = e.target.closest('[data-friend]');
+      if (!chip) return;
+      addFriendAsPartner(friends[+chip.dataset.friend]);
+      saveState();
+      rebuild();
+    });
+    wrap.appendChild(chips);
+  }
+
   // Category picker is a <select>
   wrap.querySelectorAll('[data-field]').forEach(inp => {
     inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', () => {
@@ -1995,7 +2090,24 @@ function buildPartnerRows(wrap, rebuild) {
       if (inp.dataset.field === 'hcp')      p.hcp = Math.min(54, Math.max(0, parseInt(inp.value) || 0));
       if (inp.dataset.field === 'category') p.category = inp.value || DEFAULT_CATEGORY;
       if (inp.dataset.field === 'tee')      p.tee = inp.value || null;
+      // Names are saved once typed out, see below
+      if (inp.dataset.field !== 'name') rememberFriend(p);
       saveState();
+    });
+  });
+
+  // A finished name either loads a saved friend or saves a new one
+  wrap.querySelectorAll('[data-field="name"]').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const p = getSimplePlayers()[inp.dataset.pidx];
+      const f = friendFor(p);
+      if (f) {
+        applyFriend(p, f);
+        saveState();
+        rebuild();
+      } else {
+        rememberFriend(p);
+      }
     });
   });
 
@@ -2011,12 +2123,161 @@ function buildPartnerRows(wrap, rebuild) {
   });
 }
 
+// ── FRIENDS SCREEN ──
+// Preset courses that offer a choice of tee, with every colour listed for them
+function friendCourses() {
+  return PRESET_COURSES.filter(name => name !== 'Others').map(name => {
+    const entries = Object.values(COURSES).filter(c => courseBaseName(c) === name && c.tees);
+    const colours = new Set();
+    entries.forEach(c => {
+      const own = [...new Set(c.tees.map(t => t.colour))];
+      if (own.length > 1) own.forEach(x => colours.add(x));
+    });
+    const defaultTee = (entries.find(c => c.defaultTee) || {}).defaultTee;
+    return { name, colours: [...colours], defaultTee };
+  }).filter(c => c.colours.length > 1);
+}
+
+function friendCategories() {
+  const cats = new Set();
+  Object.values(COURSES).forEach(c => (c.tees || []).forEach(t => t.players && cats.add(t.players)));
+  return cats.size ? [...cats] : [DEFAULT_CATEGORY];
+}
+
+function renderFriends(focusIdx) {
+  const scroll = document.getElementById('friendsScroll');
+  const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
+  const courses = friendCourses();
+  const cats = friendCategories();
+  // Alphabetical, so a friend still being added (no name yet) sits at the top
+  const order = friends.map((f, i) => i)
+    .sort((a, b) => friends[a].name.localeCompare(friends[b].name, undefined, { sensitivity: 'base' }));
+
+  scroll.innerHTML = !friends.length
+    ? `<div class="settings-putter-note"><span>👥</span> No friends yet. Partners you name in a round are saved here automatically.</div>`
+    : order.map(i => {
+      const f = friends[i];
+      const tees = courses.map(c => `
+        <span class="friend-lbl">${escHtml(c.name)}</span>
+        <select class="lobby-custom-input" data-fidx="${i}" data-ffield="tee" data-course="${escHtml(c.name)}">
+          <option value="">Default${c.defaultTee ? ` (${c.defaultTee})` : ''}</option>
+          ${c.colours.map(x => `<option value="${x}"${f.tees[c.name] === x ? ' selected' : ''}>${x}</option>`).join('')}
+        </select>`).join('');
+      return `<div class="friend-card">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="lobby-custom-input" style="flex:2;padding:10px" value="${escHtml(f.name)}" placeholder="Name" data-fidx="${i}" data-ffield="name">
+          <input class="lobby-custom-input" style="flex:1;padding:10px" type="number" value="${f.hcp}" placeholder="HCP" data-fidx="${i}" data-ffield="hcp">
+          <button class="pill-x" style="font-size:18px" data-fdel="${i}">✕</button>
+        </div>
+        <div class="friend-grid">
+          <span class="friend-lbl">Rated as</span>
+          <select class="lobby-custom-input" data-fidx="${i}" data-ffield="category">
+            ${cats.map(c => `<option value="${c}"${f.category === c ? ' selected' : ''}>${cap(c)}</option>`).join('')}
+          </select>
+          ${tees}
+        </div>
+      </div>`;
+    }).join('');
+
+  if (focusIdx !== undefined) {
+    const inp = scroll.querySelector(`[data-fidx="${focusIdx}"][data-ffield="name"]`);
+    if (inp) inp.focus();
+  }
+}
+
+// Partners in the current round follow their friend's details
+function syncFriendToPartners(f, oldName) {
+  getSimplePlayers().filter(p => sameName(p.name, oldName ?? f.name)).forEach(p => applyFriend(p, f));
+  saveState();
+}
+
+function handleFriendEdit(e) {
+  const el = e.target;
+  if (!el.dataset || !el.dataset.ffield) return;
+  const f = friends[+el.dataset.fidx];
+  const field = el.dataset.ffield;
+  if (field === 'name') {
+    if (e.type !== 'change') return;
+    const name = el.value.trim();
+    const taken = friends.some(x => x !== f && sameName(x.name, name));
+    if (!name || isPlaceholderName(name) || taken) {
+      el.value = f.name;
+      if (taken) alert(`${name} is already a friend.`);
+      return;
+    }
+    const oldName = f.name;
+    f.name = name;
+    if (oldName) syncFriendToPartners(f, oldName);
+  }
+  if (field === 'hcp')      f.hcp = Math.min(54, Math.max(0, parseInt(el.value) || 0));
+  if (field === 'category') f.category = el.value;
+  if (field === 'tee') {
+    if (el.value) f.tees[el.dataset.course] = el.value;
+    else delete f.tees[el.dataset.course];
+  }
+  if (field === 'hcp' || field === 'category') syncFriendToPartners(f);
+  saveFriends();
+}
+
+function closeFriends() {
+  // Drop a friend that was added but never named
+  friends = friends.filter(f => !isPlaceholderName(f.name));
+  saveFriends();
+  hideOverlay('friendsOverlay');
+  buildSettingsUI();
+}
+
+document.getElementById('friendsScroll').addEventListener('input', handleFriendEdit);
+document.getElementById('friendsScroll').addEventListener('change', handleFriendEdit);
+document.getElementById('friendsScroll').addEventListener('click', e => {
+  const del = e.target.closest('[data-fdel]');
+  if (!del) return;
+  const f = friends[+del.dataset.fdel];
+  if (f.name && !confirm(`Delete ${f.name} from your friends?`)) return;
+  friends.splice(+del.dataset.fdel, 1);
+  saveFriends();
+  renderFriends();
+});
+document.getElementById('friendsAddBtn').addEventListener('click', () => {
+  friends.push({ name: '', hcp: 36, category: DEFAULT_CATEGORY, tees: {} });
+  renderFriends(friends.length - 1);
+});
+document.getElementById('friendsClose').addEventListener('click', closeFriends);
+
 function openLobby() {
   lobbySnapshot = hasRoundData() ? snapshotRound() : null;
   buildRestoreBtn();
   // Doubled nine shows as 18
   lobbySecondRound = secondRound && eighteenIsDoubledNine(selectedCourse);
-  // Rebuild course buttons
+  buildCourseOpts();
+
+  const customInput = document.getElementById('customCourse');
+  customInput.oninput = () => {
+    selectedCourse = customInput.value.trim() || 'Others';
+    buildHoleOpts(selectedCourse);
+    buildCourseTools();
+    updateLobbyStartBtn();
+  };
+
+  // Hole buttons for the current course
+  buildHoleOpts(selectedCourse);
+
+  // HCP input
+  const hcpInput = document.getElementById('hcpInput');
+  hcpInput.value = hcp;
+  hcpInput.oninput = () => {
+    const v = parseInt(hcpInput.value, 10);
+    // Blank falls back to the max handicap
+    hcp = isNaN(v) ? DEFAULT_HCP : Math.min(54, Math.max(0, v));
+  };
+
+  buildPlayerLobby();
+
+  updateLobbyStartBtn();
+  showOverlay('lobbyOverlay');
+}
+
+function buildCourseOpts() {
   const courseOpts = document.getElementById('courseOpts');
   courseOpts.innerHTML = '';
   PRESET_COURSES.forEach(name => {
@@ -2041,6 +2302,7 @@ function openLobby() {
         customInput.style.display = 'none';
       }
       buildHoleOpts(selectedCourse);
+      buildCourseTools();
       updateLobbyStartBtn();
     });
     courseOpts.appendChild(btn);
@@ -2056,29 +2318,325 @@ function openLobby() {
     customInput.style.display = 'none';
     customInput.value = '';
   }
-  customInput.addEventListener('input', () => {
-    selectedCourse = customInput.value.trim() || 'Others';
-    buildHoleOpts(selectedCourse);
-    updateLobbyStartBtn();
-  });
-
-  // Hole buttons for the current course
-  buildHoleOpts(selectedCourse);
-
-  // HCP input
-  const hcpInput = document.getElementById('hcpInput');
-  hcpInput.value = hcp;
-  hcpInput.oninput = () => {
-    const v = parseInt(hcpInput.value, 10);
-    // Blank falls back to the max handicap
-    hcp = isNaN(v) ? DEFAULT_HCP : Math.min(54, Math.max(0, v));
-  };
-
-  buildPlayerLobby();
-
-  updateLobbyStartBtn();
-  showOverlay('lobbyOverlay');
+  buildCourseTools();
 }
+
+// "New course" plus an edit button for each saved entry of the selected course
+function buildCourseTools() {
+  const wrap = document.getElementById('courseTools');
+  wrap.innerHTML = '';
+  const add = document.createElement('button');
+  add.className = 'course-tool-btn';
+  const fromOthers = isCustomCourse(selectedCourse) && selectedCourse && selectedCourse !== 'Others';
+  add.textContent = fromOthers ? `＋ Save "${selectedCourse}" as a course` : '＋ New course';
+  add.addEventListener('click', () => openCourseEditor(null));
+  wrap.appendChild(add);
+  Object.keys(userCourses)
+    .filter(k => COURSES[k] === userCourses[k] && courseBaseName(COURSES[k]) === selectedCourse)
+    .forEach(k => {
+      const btn = document.createElement('button');
+      btn.className = 'course-tool-btn';
+      btn.textContent = `✎ Edit ${k}`;
+      btn.addEventListener('click', () => openCourseEditor(k));
+      wrap.appendChild(btn);
+    });
+}
+
+// ── COURSE EDITOR ──
+// Draft: { name, note, holes: [{ par, si }], ratingPar, tees: [{ colour, players, sss, slope }], defaultTee }.
+// Number fields hold the raw input strings until save.
+let courseDraft = null;
+let courseDraftKey = null; // key being edited, null for a new course
+
+function openCourseEditor(key) {
+  courseDraftKey = key;
+  const c = key ? userCourses[key] : null;
+  if (c) {
+    const tees = c.tees
+      ? c.tees.map(t => ({ colour: t.colour, players: t.players || '', sss: String(t.sss), slope: String(t.slope) }))
+      : (c.sss != null ? [{ colour: 'Default', players: '', sss: String(c.sss), slope: String(c.slope) }] : []);
+    courseDraft = {
+      name: key, note: c.note || '',
+      holes: c.holes.map(h => ({ par: h.par, si: h.si == null ? '' : String(h.si) })),
+      ratingPar: String(c.ratingPar ?? c.par),
+      tees, defaultTee: c.defaultTee || (tees[0] ? tees[0].colour : '')
+    };
+  } else if (isCustomCourse(selectedCourse) && selectedCourse && selectedCourse !== 'Others') {
+    // Start from what was typed under Others
+    const n = selectedHoles || customHolePars.length || 18;
+    courseDraft = {
+      name: selectedCourse, note: '',
+      holes: Array.from({ length: n }, (_, i) => ({ par: customHolePars[i] || 4, si: '' })),
+      ratingPar: '',
+      tees: customSSS != null && customSlope != null
+        ? [{ colour: 'Default', players: '', sss: String(customSSS), slope: String(customSlope) }] : [],
+      defaultTee: 'Default'
+    };
+  } else {
+    courseDraft = {
+      name: '', note: '',
+      holes: Array.from({ length: 18 }, () => ({ par: 4, si: '' })),
+      ratingPar: '',
+      tees: [{ colour: 'Yellow', players: '', sss: '', slope: '' }],
+      defaultTee: 'Yellow'
+    };
+  }
+  document.getElementById('courseEditTitle').textContent = key ? 'Edit Course' : 'New Course';
+  document.getElementById('courseEditDelete').style.display = key ? '' : 'none';
+  document.getElementById('courseEditError').textContent = '';
+  buildCourseEditor();
+  showOverlay('courseEditOverlay');
+  document.getElementById('courseEditBody').scrollTop = 0;
+}
+
+function draftPar() {
+  return courseDraft.holes.reduce((s, h) => s + h.par, 0);
+}
+
+// 18-hole par the ratings are measured against, defaulting to par scaled to 18 holes
+function draftRatingPar() {
+  const n = courseDraft.holes.length;
+  if (n === 18) return draftPar();
+  const v = parseFloat(courseDraft.ratingPar);
+  return isNaN(v) ? Math.round(draftPar() * 18 / n) : v;
+}
+
+function buildCourseEditor() {
+  const body = document.getElementById('courseEditBody');
+  const d = courseDraft;
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const n = d.holes.length;
+  const colours = [...new Set(d.tees.map(t => t.colour.trim()).filter(Boolean))];
+
+  body.innerHTML = `
+    <div class="lobby-section">
+      <div class="lobby-label">Course name</div>
+      <input type="text" class="lobby-custom-input" data-f="name" value="${esc(d.name)}" placeholder="e.g. Golf de Divonne">
+      <input type="text" class="lobby-custom-input ce-small" data-f="note" value="${esc(d.note)}" placeholder="Source of the ratings, e.g. scorecard URL (optional)">
+    </div>
+    <div class="lobby-section">
+      <div class="lobby-label">Holes</div>
+      <div class="lobby-opts">
+        ${[9, 18].map(v => `<button class="lobby-opt${n === v ? ' sel' : ''}" data-holes="${v}">${v} holes</button>`).join('')}
+        <input type="number" class="lobby-custom-input ce-count" data-f="count" min="1" max="18" value="${n}" aria-label="Number of holes">
+      </div>
+    </div>
+    <div class="lobby-section">
+      <div class="lobby-label">Par &amp; stroke index · total par <span id="ceParTotal">${draftPar()}</span></div>
+      <div class="ce-hint">Stroke index is 1 for the hardest hole. Leave blank if you don't know it.</div>
+      <div class="par-grid-vertical">
+        ${d.holes.map((h, i) => `
+          <div class="par-grid-row">
+            <span class="par-grid-num">Hole ${i + 1}</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              ${[3, 4, 5].map(p => `<button class="par-val-btn${h.par === p ? ' sel' : ''}" data-hole="${i}" data-par="${p}">${p}</button>`).join('')}
+              <input type="number" class="lobby-custom-input ce-si" data-hole="${i}" data-f="si" min="1" max="18" value="${esc(h.si)}" placeholder="SI" aria-label="Stroke index hole ${i + 1}">
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="lobby-section">
+      <div class="lobby-label">Tees &amp; ratings</div>
+      <div class="ce-hint">Course rating (SSS) and slope from the scorecard, as 18-hole values even on a 9-hole course.
+        Add a row per tee, or per tee and men/ladies.</div>
+      ${d.tees.map((t, i) => `
+        <div class="ce-tee">
+          <input type="text" class="lobby-custom-input" data-tee="${i}" data-f="colour" value="${esc(t.colour)}" placeholder="Tee (e.g. Yellow)">
+          <select class="lobby-custom-input" data-tee="${i}" data-f="players">
+            ${[['', 'Everyone'], ['men', 'Men'], ['ladies', 'Ladies']].map(([v, l]) =>
+              `<option value="${v}"${t.players === v ? ' selected' : ''}>${l}</option>`).join('')}
+          </select>
+          <input type="number" step="0.1" class="lobby-custom-input" data-tee="${i}" data-f="sss" value="${esc(t.sss)}" placeholder="SSS">
+          <input type="number" step="1" class="lobby-custom-input" data-tee="${i}" data-f="slope" value="${esc(t.slope)}" placeholder="Slope">
+          <button class="ce-remove" data-remove-tee="${i}" aria-label="Remove tee">×</button>
+        </div>`).join('')}
+      <button class="course-tool-btn" id="ceAddTee">＋ Add tee</button>
+      ${colours.length > 1 ? `
+        <div class="lobby-label" style="font-size:12px;margin-top:4px">Default tee</div>
+        <select class="lobby-custom-input" data-f="defaultTee">
+          ${colours.map(c => `<option value="${esc(c)}"${d.defaultTee === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}
+        </select>` : ''}
+    </div>
+    ${n === 18 ? '' : `
+    <div class="lobby-section">
+      <div class="lobby-label">Rating par (18 holes)</div>
+      <div class="ce-hint">The par the SSS was measured against. For a 9-hole course that's usually twice the 9-hole par.</div>
+      <input type="number" class="lobby-custom-input" data-f="ratingPar" value="${esc(d.ratingPar)}" placeholder="${draftRatingPar()}">
+    </div>`}
+    <div class="lobby-section">
+      ${shareEnabled() ? '<div class="ce-hint">Saved courses are also sent to the app\'s author so they can be added for everyone.</div>' : ''}
+      <button class="course-tool-btn" id="ceCopy">⧉ Copy as courses.js entry</button>
+    </div>`;
+
+  // Text and number fields update the draft without a rebuild, so focus is kept
+  body.querySelectorAll('input[data-f], select[data-f]').forEach(el => {
+    el.addEventListener('input', () => {
+      const f = el.dataset.f;
+      if (el.dataset.hole !== undefined) d.holes[el.dataset.hole].si = el.value;
+      else if (el.dataset.tee !== undefined) d.tees[el.dataset.tee][f] = el.value;
+      else if (f !== 'count') d[f] = el.value;
+    });
+  });
+  // Tee colours feed the default tee list
+  body.querySelectorAll('[data-f="colour"]').forEach(el => el.addEventListener('change', buildCourseEditor));
+  body.querySelector('[data-f="count"]').addEventListener('change', e => {
+    setDraftHoleCount(parseInt(e.target.value, 10));
+  });
+  body.querySelectorAll('[data-holes]').forEach(btn => btn.addEventListener('click', () => {
+    setDraftHoleCount(parseInt(btn.dataset.holes, 10));
+  }));
+  body.querySelectorAll('.par-val-btn').forEach(btn => btn.addEventListener('click', () => {
+    d.holes[btn.dataset.hole].par = parseInt(btn.dataset.par, 10);
+    btn.parentElement.querySelectorAll('.par-val-btn').forEach(b => b.classList.toggle('sel', b === btn));
+    document.getElementById('ceParTotal').textContent = draftPar();
+    const rp = body.querySelector('[data-f="ratingPar"]');
+    if (rp) rp.placeholder = draftRatingPar();
+  }));
+  body.querySelectorAll('[data-remove-tee]').forEach(btn => btn.addEventListener('click', () => {
+    d.tees.splice(parseInt(btn.dataset.removeTee, 10), 1);
+    buildCourseEditor();
+  }));
+  document.getElementById('ceAddTee').addEventListener('click', () => {
+    d.tees.push({ colour: '', players: '', sss: '', slope: '' });
+    buildCourseEditor();
+  });
+  document.getElementById('ceCopy').addEventListener('click', copyCourseSnippet);
+}
+
+function setDraftHoleCount(n) {
+  if (isNaN(n) || n < 1 || n > 18) { buildCourseEditor(); return; }
+  const holes = courseDraft.holes;
+  courseDraft.holes = Array.from({ length: n }, (_, i) => holes[i] || { par: 4, si: '' });
+  buildCourseEditor();
+}
+
+// Checks the draft and returns [key, entry], or throws a message for the user
+function draftToEntry() {
+  const d = courseDraft;
+  const name = d.name.trim();
+  if (!name) throw 'Give the course a name.';
+  if (name.toLowerCase() === 'others') throw '"Others" is reserved, pick another name.';
+  const base = name.replace(/\s*-\s*\d+\s*Hole$/i, '');
+  if (BUILTIN_COURSES.includes(name) || BUILTIN_PRESETS.includes(base)) {
+    throw `"${base}" is already built into the app.`;
+  }
+  if (name !== courseDraftKey && Object.keys(userCourses).some(k => sameName(k, name))) {
+    throw `You already have a course called "${name}".`;
+  }
+  const n = d.holes.length;
+  const seen = new Set();
+  const holes = d.holes.map((h, i) => {
+    if (String(h.si).trim() === '') return { par: h.par, si: null };
+    const si = Number(h.si);
+    if (!Number.isInteger(si) || si < 1 || si > 18) throw `Hole ${i + 1}: stroke index must be a whole number from 1 to 18.`;
+    if (seen.has(si)) throw `Stroke index ${si} is used on more than one hole.`;
+    seen.add(si);
+    return { par: h.par, si };
+  });
+  const tees = d.tees.map((t, i) => {
+    const colour = t.colour.trim();
+    const sss = parseFloat(t.sss), slope = parseFloat(t.slope);
+    if (!colour) throw `Tee ${i + 1} needs a name, e.g. Yellow.`;
+    if (isNaN(sss) || sss < 40 || sss > 85) throw `${colour} tee: SSS should be an 18-hole rating, roughly 50 to 80.`;
+    if (isNaN(slope) || slope < 55 || slope > 155) throw `${colour} tee: slope must be between 55 and 155.`;
+    const tee = { colour };
+    if (t.players) tee.players = t.players;
+    return Object.assign(tee, { sss, slope });
+  });
+  const dupe = tees.find((t, i) => tees.findIndex(u => u.colour === t.colour && u.players === t.players) !== i);
+  if (dupe) throw `The ${dupe.colour} tee is listed twice.`;
+
+  const par = holes.reduce((s, h) => s + h.par, 0);
+  const ratingPar = draftRatingPar();
+  if (n !== 18 && (ratingPar < 50 || ratingPar > 80)) throw 'Rating par should be an 18-hole par, roughly 54 to 74.';
+  const entry = { par };
+  if (ratingPar !== par) entry.ratingPar = ratingPar;
+  if (tees.length === 1 && !tees[0].players) {
+    entry.sss = tees[0].sss;
+    entry.slope = tees[0].slope;
+  } else if (tees.length) {
+    const colours = tees.map(t => t.colour);
+    entry.defaultTee = colours.includes(d.defaultTee.trim()) ? d.defaultTee.trim() : colours[0];
+    entry.tees = tees;
+  }
+  entry.holes = holes;
+  if (d.note.trim()) entry.note = d.note.trim();
+  return [name, entry];
+}
+
+function courseSnippet(name, c) {
+  const q = s => `'${String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
+  const lines = [`  ${q(name)}: {`];
+  if (c.note) lines.push(`    // ${c.note}`);
+  lines.push(`    par: ${c.par}${c.ratingPar != null ? `, ratingPar: ${c.ratingPar}` : ''},`);
+  if (c.tees) {
+    lines.push(`    defaultTee: ${q(c.defaultTee)},`, '    tees: [');
+    c.tees.forEach(t => lines.push(`      { colour: ${q(t.colour)}, ${t.players ? `players: ${q(t.players)}, ` : ''}sss: ${t.sss}, slope: ${t.slope} },`));
+    lines.push('    ],');
+  } else {
+    lines.push(`    sss: ${c.sss ?? null}, slope: ${c.slope ?? null},`);
+  }
+  lines.push('    holes: [');
+  c.holes.forEach(h => lines.push(`      { par: ${h.par}, si: ${h.si} },`));
+  lines.push('    ]', '  },');
+  return lines.join('\n');
+}
+
+function copyCourseSnippet() {
+  const err = document.getElementById('courseEditError');
+  let name, entry;
+  try { [name, entry] = draftToEntry(); } catch (msg) { err.textContent = msg; return; }
+  const text = courseSnippet(name, entry);
+  const btn = document.getElementById('ceCopy');
+  navigator.clipboard.writeText(text).then(() => {
+    err.textContent = '';
+    btn.textContent = '✓ Copied. Paste it into COURSES and add the name to PRESET_COURSES.';
+  }, () => { err.textContent = 'Could not copy to the clipboard.'; });
+}
+
+document.getElementById('courseEditSave').addEventListener('click', () => {
+  const err = document.getElementById('courseEditError');
+  let name, entry;
+  try { [name, entry] = draftToEntry(); } catch (msg) { err.textContent = msg; return; }
+  err.textContent = '';
+  const oldBase = courseDraftKey ? courseDraftKey.replace(/\s*-\s*\d+\s*Hole$/i, '') : null;
+  if (courseDraftKey && courseDraftKey !== name) delete userCourses[courseDraftKey];
+  userCourses[name] = entry;
+  saveUserCourses();
+  // Also sent to Supabase to be added to courses.js. The local copy works either way.
+  if (shareEnabled()) {
+    supabaseRpc('submit_course', { p_name: name, p_snippet: courseSnippet(name, entry), p_data: entry })
+      .catch(() => {});
+  }
+  // Select the saved course, keeping the hole choice where it still fits
+  const base = name.replace(/\s*-\s*\d+\s*Hole$/i, '');
+  if (!courseDraftKey || selectedCourse === oldBase || isCustomCourse(selectedCourse)) {
+    selectedCourse = base;
+    customHolePars = [];
+    customSSS = null;
+    customSlope = null;
+  }
+  saveState();
+  hideOverlay('courseEditOverlay');
+  buildCourseOpts();
+  buildHoleOpts(selectedCourse);
+  updateLobbyStartBtn();
+});
+
+document.getElementById('courseEditDelete').addEventListener('click', () => {
+  const key = courseDraftKey;
+  if (!key || !confirm(`Delete ${key}? A round in progress on this course will lose its pars and ratings.`)) return;
+  delete userCourses[key];
+  saveUserCourses();
+  if (selectedCourse === key.replace(/\s*-\s*\d+\s*Hole$/i, '') && isCustomCourse(selectedCourse)) selectedCourse = '';
+  saveState();
+  hideOverlay('courseEditOverlay');
+  buildCourseOpts();
+  buildHoleOpts(selectedCourse);
+  updateLobbyStartBtn();
+});
+
+document.getElementById('courseEditClose').addEventListener('click', () => hideOverlay('courseEditOverlay'));
 
 function updateLobbyStartBtn() {
   const needsNine  = selectedHoles === 9  && nineIsDerived(selectedCourse);
@@ -2160,6 +2718,16 @@ function buildSettingsUI() {
   rebuildPartners();
 
   scroll.appendChild(partnerGroup);
+
+  const friendsGroup = document.createElement('div');
+  friendsGroup.className = 'settings-group';
+  friendsGroup.innerHTML = `<div class="settings-group-title">Friends</div>
+    <button class="lobby-opt friends-open">👥 Saved friends (${friends.length}) ›</button>`;
+  friendsGroup.querySelector('button').addEventListener('click', () => {
+    renderFriends();
+    showOverlay('friendsOverlay');
+  });
+  scroll.appendChild(friendsGroup);
 
   Object.entries(ALL_CLUBS).forEach(([groupName, clubs]) => {
     const group = document.createElement('div');
