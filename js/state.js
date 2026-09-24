@@ -71,7 +71,8 @@ function saveState() {
   localStorage.setItem('gct_customslope', customSlope ?? '');
   localStorage.setItem('gct_trackclubs',  trackClubs ? '1' : '');
   localStorage.setItem('gct_players', JSON.stringify(players));
-  scheduleShareSync();
+  // live-share.js loads later, so a save made while the files are still loading skips the push
+  if (typeof scheduleShareSync === 'function') scheduleShareSync();
 }
 function loadState() {
   const savedRound      = localStorage.getItem('gct_round');
