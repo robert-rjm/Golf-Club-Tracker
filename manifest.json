@@ -1,0 +1,14 @@
+{
+  "name": "ClubTrack",
+  "short_name": "ClubTrack",
+  "description": "Track your clubs, scores and Stableford points on the course.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f1a0d",
+  "theme_color": "#0f1a0d",
+  "icons": [
+    { "src": "Logo.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
+  ]
+}

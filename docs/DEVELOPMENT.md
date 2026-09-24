@@ -38,7 +38,8 @@ is no account or server copy. The only network calls are the optional Supabase o
 | `supabase.sql` | Tables and functions for the Supabase project |
 | `view.html` · `view.js` | Read-only live view of a shared round, opened with a code |
 | `courses.html` | Public list of the built-in courses and their tees, read from `courses.js`. The README links to it, so it never needs editing |
-| `Logo.png` | Solid-background logo: browser-tab and home-screen icon, README header. iOS fills a transparent home-screen icon with black, and GitHub's light theme would hide the white ball |
+| `manifest.json` | Web app manifest, so Chrome and Edge offer to install the app. Only works when served over HTTPS, not from `file://` |
+| `Logo.png` | Solid-background logo: browser-tab, home-screen and installed-app icon, README header. iOS fills a transparent home-screen icon with black, and GitHub's light theme would hide the white ball |
 | `Logo-transparent.png` | Transparent logo used inside the app (lobby, header, labels) and the live view |
 | `js/` | The app's code, split by screen (below) |
 
