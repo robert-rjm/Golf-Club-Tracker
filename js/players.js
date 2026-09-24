@@ -1,8 +1,8 @@
 // Playing partners and saved friends.
 
 // ── FRIENDS ──
-// Partners with a real name are saved as friends: handicap, category and the tee they
-// play off at each course. Managed under ⚙ → Friends.
+// Partners with a real name are saved as friends: handicap, category, a usual tee
+// (defaultTee) and the tee they play off at particular courses. Managed under ⚙ → Friends.
 let friends = [];
 try { friends = JSON.parse(localStorage.getItem('gct_friends')) || []; } catch (e) {}
 function saveFriends() {
@@ -15,6 +15,17 @@ function friendFor(p) {
   return isPlaceholderName(p.name) ? null : friends.find(f => sameName(f.name, p.name));
 }
 
+// The friend's usual tee, if this course has that color
+function usualTeeFor(f, colors) {
+  return f.defaultTee && colors.includes(f.defaultTee) ? f.defaultTee : null;
+}
+
+// Their tee for this course, else their usual tee, else null (plays your tee)
+function friendTee(f, course, colors) {
+  const t = f.tees[course];
+  return colors.includes(t) ? t : usualTeeFor(f, colors);
+}
+
 function rememberFriend(p) {
   if (isPlaceholderName(p.name)) return;
   let f = friendFor(p);
@@ -24,9 +35,10 @@ function rememberFriend(p) {
   }
   f.hcp = p.hcp;
   f.category = p.category;
-  // Only touch the tee where there was a choice to make
-  if (selectedCourse && teeColoursFor().length > 1) {
-    if (p.tee) f.tees[selectedCourse] = p.tee;
+  // Only touch the tee where there was a choice to make. Their usual tee needs no entry.
+  const colors = teeColorsFor();
+  if (selectedCourse && colors.length > 1) {
+    if (p.tee && p.tee !== usualTeeFor(f, colors)) f.tees[selectedCourse] = p.tee;
     else delete f.tees[selectedCourse];
   }
   saveFriends();
@@ -54,22 +66,23 @@ function buildPlayerLobby() {
 // Partner rows with add/remove, used by the lobby and the settings overlay
 function buildPartnerRows(wrap, rebuild) {
   const cats    = categoriesFor();
-  const colours = teeColoursFor();
+  const colors = teeColorsFor();
   const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
   getSimplePlayers().forEach((p, i) => {
     // A saved friend plays off their own tee for this course
     const friend = friendFor(p);
+    const usual = friend ? usualTeeFor(friend, colors) : null;
     if (friend) {
-      const t = friend.tees[selectedCourse];
-      p.tee = colours.includes(t) ? t : null;
-    } else if (p.tee && !colours.includes(p.tee)) {
+      p.tee = friendTee(friend, selectedCourse, colors);
+    } else if (p.tee && !colors.includes(p.tee)) {
       p.tee = null; // tee from another course or hole count
     }
     if (!p.category) p.category = DEFAULT_CATEGORY;
-    const teeField = colours.length < 2 ? '' : `
+    // With a usual tee on this course there's no blank "your tee" option: they always have a tee
+    const teeField = colors.length < 2 ? '' : `
       <select class="lobby-custom-input" style="flex:1;padding:10px 30px 10px 10px" data-pidx="${i}" data-field="tee">
-        <option value=""${p.tee ? '' : ' selected'}>Tee: ${selectedTee || 'default'}</option>
-        ${colours.map(c => `<option value="${c}"${p.tee === c ? ' selected' : ''}>${c}</option>`).join('')}
+        ${usual ? '' : `<option value=""${p.tee ? '' : ' selected'}>Tee: ${selectedTee || 'default'}</option>`}
+        ${colors.map(c => `<option value="${c}"${p.tee === c ? ' selected' : ''}>${c}${c === usual ? ' (usual)' : ''}</option>`).join('')}
       </select>`;
     const catField = cats.length < 2 ? '' : `
       <select class="lobby-custom-input" style="flex:1;padding:10px 30px 10px 10px" data-pidx="${i}" data-field="category">
@@ -165,18 +178,18 @@ function buildPartnerRows(wrap, rebuild) {
 }
 
 // ── FRIENDS SCREEN ──
-// Preset courses that offer a choice of tee, with every colour listed for them
+// Preset courses that offer a choice of tee, with every color listed for them
 function friendCourses() {
   return PRESET_COURSES.filter(name => name !== 'Others').map(name => {
     const entries = Object.values(COURSES).filter(c => courseBaseName(c) === name && c.tees);
-    const colours = new Set();
+    const colors = new Set();
     entries.forEach(c => {
-      const own = [...new Set(c.tees.map(t => t.colour))];
-      if (own.length > 1) own.forEach(x => colours.add(x));
+      const own = [...new Set(c.tees.map(t => t.color))];
+      if (own.length > 1) own.forEach(x => colors.add(x));
     });
     const defaultTee = (entries.find(c => c.defaultTee) || {}).defaultTee;
-    return { name, colours: [...colours], defaultTee };
-  }).filter(c => c.colours.length > 1);
+    return { name, colors: [...colors], defaultTee };
+  }).filter(c => c.colors.length > 1);
 }
 
 function friendCategories() {
@@ -198,12 +211,16 @@ function renderFriends(focusIdx) {
     ? `<div class="settings-putter-note"><span>👥</span> No friends yet. Partners you name in a round are saved here automatically.</div>`
     : order.map(i => {
       const f = friends[i];
-      const tees = courses.map(c => `
+      // Blank follows their usual tee where the course has it, else the course default
+      const tees = courses.map(c => {
+        const usual = usualTeeFor(f, c.colors);
+        return `
         <span class="friend-lbl">${escHtml(c.name)}</span>
         <select class="lobby-custom-input" data-fidx="${i}" data-ffield="tee" data-course="${escHtml(c.name)}">
-          <option value="">Default${c.defaultTee ? ` (${c.defaultTee})` : ''}</option>
-          ${c.colours.map(x => `<option value="${x}"${f.tees[c.name] === x ? ' selected' : ''}>${x}</option>`).join('')}
-        </select>`).join('');
+          <option value="">${usual ? `Usual (${usual})` : `Default${c.defaultTee ? ` (${c.defaultTee})` : ''}`}</option>
+          ${c.colors.filter(x => x !== usual).map(x => `<option value="${x}"${f.tees[c.name] === x ? ' selected' : ''}>${x}</option>`).join('')}
+        </select>`;
+      }).join('');
       return `<div class="friend-card">
         <div style="display:flex;gap:8px;align-items:center">
           <input class="lobby-custom-input" style="flex:2;padding:10px" value="${escHtml(f.name)}" placeholder="Name" data-fidx="${i}" data-ffield="name">
@@ -215,10 +232,14 @@ function renderFriends(focusIdx) {
           <select class="lobby-custom-input" data-fidx="${i}" data-ffield="category">
             ${cats.map(c => `<option value="${c}"${f.category === c ? ' selected' : ''}>${cap(c)}</option>`).join('')}
           </select>
+          <span class="friend-lbl">Usual tee</span>
+          <input class="lobby-custom-input" value="${escHtml(f.defaultTee || '')}" placeholder="e.g. Blue" list="friendTeeColors" autocomplete="off" data-fidx="${i}" data-ffield="defaultTee">
           ${tees}
         </div>
       </div>`;
-    }).join('');
+    }).join('') + `<datalist id="friendTeeColors">
+      ${teeColorSuggestions().map(c => `<option value="${escHtml(c)}">`).join('')}
+    </datalist>`;
 
   if (focusIdx !== undefined) {
     const inp = scroll.querySelector(`[data-fidx="${focusIdx}"][data-ffield="name"]`);
@@ -255,6 +276,20 @@ function handleFriendEdit(e) {
   if (field === 'tee') {
     if (el.value) f.tees[el.dataset.course] = el.value;
     else delete f.tees[el.dataset.course];
+  }
+  if (field === 'defaultTee') {
+    // Take the spelling courses use ("blue" → "Blue"), since tees are matched exactly
+    const typed = el.value.trim();
+    const known = teeColorSuggestions().find(c => c.toLowerCase() === typed.toLowerCase());
+    if (typed) f.defaultTee = known || typed;
+    else delete f.defaultTee;
+    // Once typed out, drop course entries it makes redundant and show it in each course's list
+    if (e.type === 'change') {
+      Object.keys(f.tees).forEach(k => { if (f.tees[k] === f.defaultTee) delete f.tees[k]; });
+      saveFriends();
+      renderFriends();
+      return;
+    }
   }
   if (field === 'hcp' || field === 'category') syncFriendToPartners(f);
   saveFriends();

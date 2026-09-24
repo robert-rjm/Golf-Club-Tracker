@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" class="view">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClubTrack Courses</title>
+<link rel="icon" href="Logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="view-wrap">
+  <div class="view-top">
+    <a class="view-brand" href="index.html"><img class="logo-icon" src="Logo-transparent.png" alt="">ClubTrack</a>
+  </div>
+  <div class="view-head">
+    <h1 class="courses-title">Courses</h1>
+    <p class="courses-intro">
+      Built into the app with the par, stroke index and ratings for every tee, so Stableford
+      works straight away. Playing somewhere else? Search for it in the app's lobby and save it
+      as a course.
+    </p>
+  </div>
+  <div id="courseList"></div>
+</div>
+
+<script src="courses.js"></script>
+<script>
+// Lists the built-in courses straight from courses.js, so this page never needs updating.
+(() => {
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const baseName = k => k.replace(/\s*-\s*\d+\s*Hole$/i, '');
+  const names = PRESET_COURSES.filter(n => n !== 'Others');
+
+  // What the lobby offers for one entry of the course
+  function holesText(entry, siblings) {
+    const n = entry.holes.length;
+    const has18 = siblings.some(e => e.holes.length === 18);
+    if (n === 18) return '18 holes, or the front or back 9';
+    if (n === 9 && !has18) return '9 holes, or 18 by playing them twice';
+    return `${n} holes`;
+  }
+
+  // One row per tee, with men and ladies side by side when they're rated separately
+  function teeTable(entry) {
+    const tees = entry.tees || (entry.sss != null ? [{ color: '', sss: entry.sss, slope: entry.slope }] : []);
+    if (!tees.length) return '<div class="course-card-meta">No ratings, so no Stableford points</div>';
+    const rating = t => t ? `${Number(t.sss).toFixed(1)} / ${t.slope}` : '–';
+    const split = tees.some(t => t.players);
+    const cols = split ? [['men', 'Men'], ['ladies', 'Ladies']] : [[null, 'Everyone']];
+    const colors = [...new Set(tees.map(t => t.color))];
+    const rows = colors.map(color => `
+      <tr>
+        <td>${esc(color || '–')}${color && color === entry.defaultTee ? ' <small>default</small>' : ''}</td>
+        ${cols.map(([who]) => `<td>${rating(tees.find(t => t.color === color && (!who || !t.players || t.players === who)))}</td>`).join('')}
+      </tr>`).join('');
+    return `
+      <div class="view-table-wrap">
+        <table class="view-table course-tees">
+          <tr><th>Tee</th>${cols.map(([, label]) => `<th>${label}</th>`).join('')}</tr>
+          ${rows}
+        </table>
+      </div>`;
+  }
+
+  const html = names.map(name => {
+    const entries = Object.keys(COURSES).filter(k => baseName(k) === name).map(k => COURSES[k]);
+    return `
+      <section class="sum-section course-card">
+        <h2 class="course-card-name">${esc(name)}</h2>
+        ${entries.map(e => `
+          <div class="course-card-meta">${holesText(e, entries)} · par ${e.par}${e.holes.length === 9 ? ' for 9' : ''}</div>
+          ${teeTable(e)}`).join('')}
+        <div class="course-card-note">Ratings are course rating / slope.</div>
+      </section>`;
+  }).join('');
+
+  document.getElementById('courseList').innerHTML =
+    `<div class="courses-count">${names.length} courses</div>${html}`;
+
+  // Opened from the app's lobby, so offer the way back
+  if (new URLSearchParams(location.search).has('app')) {
+    const back = document.querySelector('.view-brand');
+    back.textContent = '‹ Back to the app';
+    back.classList.add('view-back');
+  }
+})();
+</script>
+</body>
+</html>

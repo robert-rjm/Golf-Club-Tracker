@@ -113,9 +113,9 @@ function courseEntry() {
 }
 
 // Tees and categories for the chosen hole count, empty if the course has no tees
-function teeColoursFor() {
+function teeColorsFor() {
   const c = courseEntry();
-  return c && c.tees ? [...new Set(c.tees.map(t => t.colour))] : [];
+  return c && c.tees ? [...new Set(c.tees.map(t => t.color))] : [];
 }
 
 function categoriesFor() {
@@ -132,23 +132,23 @@ function mainPlayer() {
 function buildTeeOpts() {
   const wrap    = document.getElementById('teeOpts');
   const section = document.getElementById('teeSection');
-  const colours = teeColoursFor();
+  const colors = teeColorsFor();
   wrap.innerHTML = '';
-  if (colours.length < 2) {
+  if (colors.length < 2) {
     // Drop a tee from another course or hole count
-    if (!colours.includes(selectedTee)) selectedTee = null;
+    if (!colors.includes(selectedTee)) selectedTee = null;
     section.style.display = 'none';
     return;
   }
   const course = courseEntry();
-  if (!colours.includes(selectedTee)) selectedTee = (course && course.defaultTee) || colours[0];
+  if (!colors.includes(selectedTee)) selectedTee = (course && course.defaultTee) || colors[0];
   // Too many tees for pills, use a dropdown
   const sel = document.createElement('select');
   sel.className = 'lobby-custom-input';
   sel.id = 'teeSelect';
-  sel.innerHTML = colours.map(colour =>
-    `<option value="${colour}"${selectedTee === colour ? ' selected' : ''}>${colour}${
-      course && course.defaultTee === colour ? ' (default)' : ''}</option>`
+  sel.innerHTML = colors.map(color =>
+    `<option value="${color}"${selectedTee === color ? ' selected' : ''}>${color}${
+      course && course.defaultTee === color ? ' (default)' : ''}</option>`
   ).join('');
   sel.addEventListener('change', () => {
     selectedTee = sel.value;

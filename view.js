@@ -4,7 +4,7 @@ const REFRESH_MS = 30000;
 const PLAYER_COLORS = ['#c9a84c', '#5fb0c9', '#e0973c', '#8fbf5f', '#d1637a', '#8a7fd6'];
 
 const params = new URLSearchParams(location.search);
-let code = normaliseCode(params.get('code') || '');
+let code = normalizeCode(params.get('code') || '');
 const fromApp = params.has('app'); // opened from the phone app, so offer the way back
 let round = null, updatedAt = null, playerIdx = 0, refreshTimer = null;
 
@@ -177,14 +177,14 @@ const codeInput = document.getElementById('codeInput');
 
 // Formats as XXX-XXX while typing and loads as soon as the sixth character is in
 codeInput.addEventListener('input', () => {
-  const c = normaliseCode(codeInput.value).slice(0, 6);
+  const c = normalizeCode(codeInput.value).slice(0, 6);
   codeInput.value = c.length > 3 ? formatCode(c) : c;
   if (c.length === 6 && c !== code) showCode(c);
 });
 
 document.getElementById('codeForm').addEventListener('submit', e => {
   e.preventDefault();
-  const next = normaliseCode(codeInput.value);
+  const next = normalizeCode(codeInput.value);
   if (next.length !== 6) { setStatus('A code has 6 characters, e.g. GX7-42K.'); return; }
   showCode(next);
 });

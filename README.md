@@ -22,7 +22,7 @@ Log the club behind every shot or just keep track of your score. One phone keeps
 - Or alternatively, to only track the totals per hole, with the **Score Only** option.
 
 **Follow a round from anywhere.** In the round summary, tap **Get a live code** to share the
-round. Anyone can enter the code (e.g. `GX7-42K`) under **📡 Follow a live round** in the app,
+round. Anyone can enter the code (e.g. `GX7-42K`) under **📡 Follow a round** in the app,
 or on the [live view page](https://robert-rjm.github.io/Golf-Club-Tracker/view.html), to see
 the scorecard, Stableford points and clubs per hole, updating as the round is played.
 Codes stop working 30 days after the last update, or straight away with **Stop sharing**.
@@ -42,19 +42,12 @@ Your rounds are saved on your phone only. Clearing your browser's data for the s
 
 ## Courses
 
-These courses are built in, with the par, stroke index and ratings for every tee, so Stableford
-works straight away:
+A growing list of courses is built in, with the par, stroke index and ratings for every tee, so
+Stableford works straight away. See the **[course list](https://robert-rjm.github.io/Golf-Club-Tracker/courses.html)**
+for every course, its hole options and its tees.
 
-| Course | Holes | Par |
-|--------|-------|-----|
-| Golfclub St Genis | 9 · 18 | 37 (9 holes) |
-| Golfclub St Genis, 5-hole course | 5 | 16 |
-| Ugolf Aravella Andorra | 9 · 18 | 71 |
-| Grandvalira Golf Soldeu | 9 · 18 | 33 (9 holes) |
-| Verbier Les Esserts | 9 · 18 | 69 |
-
-To play the 5-hole course, pick **Golfclub St Genis**, then **5 holes**. Choosing 18 holes on
-a 9-hole course plays the nine twice.
+Choosing 18 holes on a 9-hole course plays the nine twice. A course with a second layout, like
+the 5 holes at Golfclub St Genis, offers it as an extra hole count under the course.
 
 ### Playing somewhere else
 
@@ -86,7 +79,7 @@ the par and stroke index of each hole, and the rating and slope for each tee, fo
 ## Running your own copy
 
 The app is a handful of static files with no build step. You're welcome to run your own copy
-for non-commercial use, crediting this project and keeping the same licence (see below). For
+for non-commercial use, crediting this project and keeping the same license (see below). For
 the file layout, setting up live sharing with your own Supabase project, and adding courses
 to the code, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
