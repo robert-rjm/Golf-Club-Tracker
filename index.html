@@ -57,7 +57,7 @@
 </div>
 <div id="continueBackdrop" style="display:none;position:fixed;inset:0;z-index:199;background:rgba(0,0,0,0.45)"></div>
 
-<!-- Tracking sheet — shown at the first tee on every new round -->
+<!-- Tracking sheet, shown at the first tee -->
 <div id="trackSheet" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:200;
   background:var(--dark);border-top:1px solid rgba(255,255,255,0.08);
   border-radius:20px 20px 0 0;box-shadow:0 -8px 32px rgba(0,0,0,0.4);
@@ -76,6 +76,7 @@
     <div class="lobby-tagline">Track every club. Every hole.</div>
   </div>
   <div class="lobby-scroll">
+    <button class="restore-btn" id="restoreBtn" style="display:none"></button>
     <div class="lobby-section">
       <div class="lobby-label">Course</div>
       <div class="lobby-opts" id="courseOpts"></div>
@@ -114,10 +115,31 @@
     <button class="ov-close" id="sumClose">×</button>
   </div>
   <div class="ov-player-switch" id="ovPlayerSwitch"></div>
-  <div class="ov-body" id="ovBody"></div>
-  <div class="ov-stats" id="ovStats"></div>
+  <div class="ov-body" id="ovBody">
+    <div class="sum-section">
+      <div class="sum-sec-head"><span class="lobby-label">⛳ Club Hits</span><span class="sum-sec-hint">tap a hole for clubs</span></div>
+      <div class="hole-grid" id="ovHoles"></div>
+    </div>
+    <div class="sum-section" id="ovStatsSection">
+      <div class="sum-sec-head"><span class="lobby-label">📊 Statistics</span><span class="sum-sec-hint">tap for details</span></div>
+      <div class="ov-stats" id="ovStats"></div>
+    </div>
+    <div class="sum-section" id="ovShareSection" style="display:none">
+      <div class="sum-sec-head"><span class="lobby-label">📡 Live Share</span><span class="sum-sec-hint" id="shareStatus"></span></div>
+      <div id="ovShare"></div>
+    </div>
+  </div>
   <button class="copy-btn" id="copyBtn">Copy to Clipboard</button>
   <button class="new-round-btn" id="newRoundBtn">New Round</button>
+
+  <!-- Detail sheet -->
+  <div class="sum-sheet" id="sumSheet">
+    <div class="ov-head">
+      <div class="ov-title" id="sheetTitle"></div>
+      <button class="ov-close" id="sheetBack">‹</button>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
 </div>
 
 <!-- Settings overlay -->
@@ -131,6 +153,7 @@
 </div>
 
 <script src="courses.js"></script>
+<script src="share.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

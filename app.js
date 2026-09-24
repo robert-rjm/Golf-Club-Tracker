@@ -5,20 +5,16 @@ const ALL_CLUBS = {
   'Wedges':         ['PW', 'PA', 'GW', 'AW', 'SW', 'LW']
 };
 
-// Logged alongside clubs but not clubs, so they never count towards "Most Used".
-// 'Shot' is the placeholder a score-only round logs in place of a club name.
+// Logged as strokes but not clubs. 'Shot' is the score-only placeholder.
 const NOT_A_CLUB = ['Putter', 'Penalty', 'Shot'];
 
 function withSecondRound(courseObj) {
   if (!secondRound) return courseObj;
-  // Only the hole list doubles. par/ratingPar/sss/slope stay at the course's rating
-  // values — calcPlayingHCP scales the resulting course handicap up by totalHoles/18,
-  // so doubling the par here too would mismatch it against the un-doubled rating and
-  // swing the handicap wildly negative.
+  // Only the holes double. The ratings stay 18-hole values, calcPlayingHCP scales them.
   return { ...courseObj, holes: [...courseObj.holes, ...courseObj.holes] };
 }
 
-// The front or back nine of an 18-hole course entry
+// Front or back nine of an 18-hole entry
 function nineSlice(courseObj, side) {
   return side === 'back' ? courseObj.holes.slice(9, 18) : courseObj.holes.slice(0, 9);
 }
@@ -30,32 +26,22 @@ function withStartNine(courseObj) {
   return { ...courseObj, holes };
 }
 
-// Ratings vary by tee colour and player category, the card does not — so this returns
-// only { sss, slope }. A course with no `tees` list keeps using its top-level ratings.
-// Passing null for either axis takes the course's defaultTee and, within it, the first
-// entry listed. An unrated combination degrades down the chain below to the default tee,
-// so a round never ends up with no ratings at all.
-//
-// A tee entry with no `players` is rated for everyone, which is how most courses outside
-// France publish: one rating per tee, no men/ladies split. Such an entry matches whatever
-// category is asked for, so a colour can mix the two — list the gendered entries and let
-// an unlabelled one catch every other category.
+// Picks { sss, slope } for a tee and category, falling back to the default tee.
+// A tee entry with no `players` is rated for every category.
 function ratingFor(course, tee, players) {
   if (!course.tees || !course.tees.length) return { sss: course.sss, slope: course.slope };
   const pick = (colour, cat) => course.tees.find(x =>
     (!colour || x.colour === colour) && (!cat || !x.players || x.players === cat));
   const colour = tee || course.defaultTee;
-  const t = pick(colour, players)              // the tee and category asked for
-         || pick(colour, null)                 // that tee, whichever category it lists
-         || pick(course.defaultTee, players)   // unknown tee — fall back to the default
+  const t = pick(colour, players)
+         || pick(colour, null)
+         || pick(course.defaultTee, players)
          || pick(course.defaultTee, null)
          || course.tees[0];
   return { sss: t.sss, slope: t.slope };
 }
 
-// Resolves the hole list for the round, then layers on the ratings for the tee this
-// player is off and the category they are rated under. `selectedTee` is the lobby's
-// choice — yours, and the default for any partner who has not picked their own.
+// Course data for the round with the player's tee ratings applied
 function getCourseData(player) {
   const course = buildCourseData();
   if (!course) return course;
@@ -64,30 +50,25 @@ function getCourseData(player) {
 }
 
 function buildCourseData() {
-  // Check for an explicit entry first
   const explicit = Object.values(COURSES).find(c =>
     courseBaseName(c) === selectedCourse && c.holes.length === selectedHoles
   );
   if (explicit) return withSecondRound(withStartNine(explicit));
-  // For 9 holes derived from an 18-hole entry (front or back nine)
+  // 9 holes sliced from an 18-hole entry
   if (selectedHoles === 9 && selectedNine) {
     const full = Object.values(COURSES).find(c =>
       courseBaseName(c) === selectedCourse && c.holes.length === 18
     );
     if (full) {
-      // A second round may be played on the other nine, so build the hole list from
-      // both selections rather than repeating selectedNine twice.
+      // A second round may be on the other nine
       const holes = secondRound
         ? [...nineSlice(full, selectedNine), ...nineSlice(full, secondNine || selectedNine)]
         : nineSlice(full, selectedNine);
-      // Keep full.par/ratingPar/sss/slope (18-hole rating) intact — calcPlayingHCP
-      // already scales the resulting course handicap down by totalHoles/18 for
-      // partial rounds. Overriding par with the 9-hole subset here would mismatch
-      // it against the still-18-hole sss/slope and badly inflate the handicap calc.
+      // Keep the 18-hole par/ratingPar/sss/slope, calcPlayingHCP scales for holes played
       return { ...full, holes };
     }
   }
-  // Custom/Others course — build synthetic data from customHolePars (default par 4)
+  // Custom course, built from customHolePars
   if (selectedHoles > 0) {
     const baseHoles = Array.from({ length: selectedHoles }, (_, i) => ({
       par: customHolePars[i] || null, si: null
@@ -95,27 +76,24 @@ function buildCourseData() {
     const holes = secondRound ? [...baseHoles, ...baseHoles] : baseHoles;
     const knownPars = baseHoles.filter(h => h.par !== null);
     const basePar = knownPars.length ? knownPars.reduce((s, h) => s + h.par, 0) : null;
-    // customSSS is entered as an 18-hole rating, so ratingPar has to be 18-hole too.
+    // customSSS is an 18-hole rating, so ratingPar is scaled to 18 holes too
     const ratingPar = basePar !== null ? basePar * 18 / selectedHoles : null;
     return { par: basePar, ratingPar, sss: customSSS, slope: customSlope, holes };
   }
   return null;
 }
 
-// Total holes being played (accounts for second round)
 function totalHolesPlayed() {
   return selectedHoles * (secondRound ? 2 : 1);
 }
 
-// Returns the base course name (strips ' - X Hole' suffix if present)
+// Strips the ' - N Hole' suffix
 function courseBaseName(courseData) {
   const key = Object.keys(COURSES).find(k => COURSES[k] === courseData);
   return key ? key.replace(/\s*-\s*\d+\s*Hole$/i, '') : '';
 }
 
-// WHS course handicap for any player, adjusted for the number of holes played.
-// sss/slope are always 18-hole-equivalent ratings, so ratingPar (the par those ratings
-// were measured against) is used here rather than the par of the holes being played.
+// WHS course handicap scaled to the holes played. Uses ratingPar, not the played par.
 function calcPlayingHCP(playerHcp, course, totalHoles) {
   if (course.slope == null || course.sss == null) return Math.round(playerHcp * totalHoles / 18);
   const ratingPar = course.ratingPar ?? course.par;
@@ -123,20 +101,17 @@ function calcPlayingHCP(playerHcp, course, totalHoles) {
   return Math.round(ch * totalHoles / 18);
 }
 
-// Stroke indexes are ranked 1..18 across a whole course entry, but a round may play a
-// subset of it (a single nine), repeat holes (a second round), or use holes with no SI
-// at all (custom courses). Rank the holes actually being played into a dense 1..n so
-// the stroke allocation below hands out exactly the playing handicap, no more or less.
+// Ranks the holes in play 1..n by SI, so the strokes handed out sum to the playing handicap
 function strokeRanks(course) {
   const order = course.holes.map((h, i) => ({ i, si: h.si == null ? Infinity : h.si }));
-  // Ties — a repeated nine, or holes with no SI — fall back to the order played.
+  // Ties (repeated nine, no SI) go in playing order
   order.sort((a, b) => a.si - b.si || a.i - b.i);
   const ranks = new Array(course.holes.length);
   order.forEach((o, r) => { ranks[o.i] = r + 1; });
   return ranks;
 }
 
-// How many extra strokes a player receives on a given hole (0-based index)
+// Extra strokes received on a hole (0-based index)
 function strokesOnHole(holeIdx, playingHcp, course) {
   const numHoles = course.holes.length;
   if (!numHoles) return 0;
@@ -144,13 +119,12 @@ function strokesOnHole(holeIdx, playingHcp, course) {
   if (playingHcp >= 0) {
     return Math.floor(playingHcp / numHoles) + (rank <= playingHcp % numHoles ? 1 : 0);
   }
-  // A negative course handicap gives strokes back, starting at the easiest hole, so
-  // count in from the other end of the ranking.
+  // Negative handicap gives strokes back, starting at the easiest hole
   const give = -playingHcp;
   return -(Math.floor(give / numHoles) + (numHoles - rank < give % numHoles ? 1 : 0));
 }
 
-// Stableford points for a hole (returns null if hole not played)
+// Stableford points for a hole, null if not played
 function stablefordPoints(holeIdx, grossShots, playingHcp, course) {
   if (!grossShots) return null;
   const par     = course.holes[holeIdx].par;
@@ -159,7 +133,7 @@ function stablefordPoints(holeIdx, grossShots, playingHcp, course) {
   return Math.max(0, 2 + par + strokes - grossShots);
 }
 
-// WHS "Net Double Bogey" cap for a hole (max score countable for handicap purposes)
+// Net double bogey cap
 function adjustedGrossForHole(holeIdx, grossShots, playingHcp, course) {
   if (!grossShots) return null;
   const par = course.holes[holeIdx].par;
@@ -168,15 +142,9 @@ function adjustedGrossForHole(holeIdx, grossShots, playingHcp, course) {
   return Math.min(grossShots, par + 2 + strokes);
 }
 
-// WHS Score Differential: (113 / Slope Rating) × (Adjusted Gross Score − Course Rating − PCC)
-// PCC (Playing Conditions Calculation) isn't computed here — it needs field-wide scoring
-// data this app doesn't track, so it's treated as 0. For rounds shorter than 18 holes the
-// result is scaled to an 18-hole equivalent, matching how playing handicap is already
-// scaled elsewhere in this app for partial rounds.
+// WHS score differential, PCC taken as 0. Partial rounds are scaled to 18 holes.
 function scoreDifferential(course, holesCounted, adjustedGrossTotal) {
   if (!course || course.slope == null || course.sss == null || !holesCounted) return null;
-  // course.sss is always an 18-hole-equivalent rating (same assumption calcPlayingHCP
-  // makes) — scale it down to the holes actually played before comparing.
   const sss  = course.sss * holesCounted / 18;
   const diff = (113 / course.slope) * (adjustedGrossTotal - sss);
   return diff * 18 / holesCounted;
@@ -198,24 +166,23 @@ let round = Array.from({length: HOLES}, () => []);
 // ── LOBBY STATE ──
 const HOLE_OPTIONS   = [5, 9, 18];
 let selectedCourse   = '';
-let selectedHoles    = 0;   // 0 = not yet chosen
-let selectedNine     = null; // 'front' | 'back' | null — only used when 9 holes derived from 18
-let secondNine       = null; // 'front' | 'back' | null — the nine played in an added second round
-let selectedStart    = null; // 'front' | 'back' | null — which 9 to start on for a full 18
-let selectedTee      = null; // tee colour for the round; null uses the course's defaultTee
-let secondRound      = false; // play the selected holes twice (e.g. 9 → 18)
-let lobbySecondRound = false; // lobby picked 18 on a 9-hole course — play its nine twice
-let customHolePars   = [];   // per-hole par for custom/Others courses (null = not set)
-let customSSS        = null; // Standard Scratch Score for custom courses
-let customSlope      = null; // Slope rating for custom courses
-let trackClubs       = true; // false = score-only round: one total per hole, no club per shot
+let selectedHoles    = 0; // 0 = not chosen yet
+let selectedNine     = null; // 'front' | 'back', 9 holes from an 18-hole course
+let secondNine       = null; // nine played in the second round
+let selectedStart    = null; // starting nine for a full 18
+let selectedTee      = null; // null = course defaultTee
+let secondRound      = false; // play the holes twice
+let lobbySecondRound = false; // 18 on a 9-hole course
+let customHolePars   = []; // null = not set
+let customSSS        = null;
+let customSlope      = null;
+let trackClubs       = true; // false = score-only
 let hcp = localStorage.getItem('gct_hcp') !== null
   ? parseInt(localStorage.getItem('gct_hcp'), 10)
   : DEFAULT_HCP;
 
 // ── MULTIPLAYER STATE ──
-// The detailed player carries no `hcp`: scoring reads the global `hcp` for them
-// (`isDetailed ? hcp : p.hcp`), so a copy here would only drift. Partners have their own.
+// The detailed player has no `hcp`, scoring uses the global one
 let players = [
   { name: 'You', mode: 'detailed', category: DEFAULT_CATEGORY }
 ];
@@ -243,6 +210,7 @@ function saveState() {
   localStorage.setItem('gct_customslope', customSlope ?? '');
   localStorage.setItem('gct_trackclubs',  trackClubs ? '1' : '');
   localStorage.setItem('gct_players', JSON.stringify(players));
+  scheduleShareSync();
 }
 function loadState() {
   const savedRound      = localStorage.getItem('gct_round');
@@ -260,7 +228,7 @@ function loadState() {
   if (savedRound)      round          = JSON.parse(savedRound);
   if (savedHole)       hole           = parseInt(savedHole, 10);
   if (savedHoles)      HOLES          = parseInt(savedHoles, 10);
-  // 0 rather than HOLES, so a first run shows nothing selected instead of a phantom 18
+  // 0 so a first run shows nothing selected
   selectedHoles  = savedSelHoles ? parseInt(savedSelHoles, 10) : 0;
   secondRound    = savedSecondRound === '1';
   selectedNine   = savedNine  || null;
@@ -271,13 +239,12 @@ function loadState() {
   if (savedCustomPars) customHolePars = JSON.parse(savedCustomPars);
   if (savedPlayers)    players        = JSON.parse(savedPlayers);
   players.forEach(p => {
-    // Drop the stale copy older versions stored on the detailed player
+    // Older versions stored hcp on the detailed player
     if (p.mode === 'detailed') delete p.hcp;
-    // Players saved before categories existed default in rather than staying unrated
+    // Players saved before categories existed
     if (!p.category) p.category = DEFAULT_CATEGORY;
   });
-  // Corrupted or hand-cleared storage could otherwise leave no detailed player at all,
-  // which mainPlayer() reports as undefined and every caller of it then trips over.
+  // Always keep a detailed player
   if (!players.some(p => p.mode === 'detailed')) {
     players.unshift({ name: 'You', mode: 'detailed', category: DEFAULT_CATEGORY });
   }
@@ -285,7 +252,7 @@ function loadState() {
   const savedSlope = localStorage.getItem('gct_customslope');
   if (savedSSS)   customSSS   = savedSSS   ? parseFloat(savedSSS)   : null;
   if (savedSlope) customSlope = savedSlope ? parseFloat(savedSlope) : null;
-  // Absent on rounds saved before score-only mode existed — those tracked clubs
+  // Older saves predate score-only mode
   const savedTrackClubs = localStorage.getItem('gct_trackclubs');
   trackClubs = savedTrackClubs === null ? true : savedTrackClubs === '1';
 }
@@ -331,7 +298,7 @@ function buildClubButtons() {
 }
 
 function buildClubGrids(area) {
-  // Filter using master list order, not activeBag order
+  // Master list order, not bag order
   const groups = {
     'Woods & Hybrid': ALL_CLUBS['Woods & Hybrid'].filter(c => activeBag.includes(c)),
     'Irons':          ALL_CLUBS['Irons'].filter(c => activeBag.includes(c)),
@@ -370,7 +337,7 @@ function buildClubGrids(area) {
 }
 
 function buildPutterStepper(area) {
-  // Putter stepper — always present alongside the clubs
+  // Putter stepper
   const putterGroup = document.createElement('div');
   putterGroup.className = 'group';
   putterGroup.innerHTML = `
@@ -418,8 +385,7 @@ function buildPenaltyButton(area) {
 }
 
 // ── SCORE-ONLY PAD ──
-// The total is the primary number. Putts and penalties below are a breakdown *of* it,
-// never an addition to it, so forgetting to log a putt can never make the score wrong.
+// Putts and penalties are a breakdown of the total, never added to it
 function buildScorePad(area) {
   const group = document.createElement('div');
   group.className = 'group';
@@ -436,9 +402,7 @@ function buildScorePad(area) {
     <div class="score-hint" id="scoreHint"></div>`;
   area.appendChild(group);
 
-  // An unplayed hole sits on its par: tapping the number takes par, ± steps away from
-  // it. Nothing is written to `round` until one of those happens, so an unvisited hole
-  // stays genuinely empty for the strip, "holes logged" and the Stableford total.
+  // An unplayed hole shows its par. Nothing is saved until the score is tapped or stepped.
   document.getElementById('scorePlus').addEventListener('click', () => {
     setHoleTotal((holeTotal() || pendingScore() || 0) + 1);
     bumpScore(); saveState(); render();
@@ -450,9 +414,9 @@ function buildScorePad(area) {
     bumpScore(); saveState(); render();
   });
   document.getElementById('scoreCount').addEventListener('click', () => {
-    if (holeTotal()) return;               // already scored — the steppers edit it
+    if (holeTotal()) return;
     const par = pendingScore();
-    if (!par) return;                      // no par data to preselect
+    if (!par) return;
     setHoleTotal(par);
     bumpScore(); saveState(); render();
   });
@@ -483,8 +447,7 @@ function buildBreakdownSteppers(area) {
     </div>`;
   area.appendChild(group);
 
-  // Both steppers only ever reassign strokes already inside the total, so the score
-  // never moves underneath the golfer. `updateScorePadUI` disables + when it is full.
+  // Steppers only move strokes around inside the total
   const bump = id => {
     const el = document.getElementById(id);
     el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
@@ -552,9 +515,7 @@ function buildPartnerSteppers(area) {
 
     area.appendChild(partnerGroup);
 
-    // Event listeners. Like the main pad, an unscored hole sits on its par: ± steps away
-    // from it and tapping the number takes it, but nothing is written to the partner's
-    // card until one of those happens, so an unplayed hole stays genuinely empty.
+    // Same par preselect as the main pad
     partnerList.querySelectorAll('.partner-plus').forEach(btn => {
       btn.addEventListener('click', () => {
         const p = getSimplePlayers()[btn.dataset.pidx];
@@ -569,7 +530,7 @@ function buildPartnerSteppers(area) {
         const p = getSimplePlayers()[btn.dataset.pidx];
         const current = p.round[hole - 1];
         if (current) {
-          // Stepping below 1 clears the hole, putting it back on the par preselect
+          // Below 1 clears the hole
           p.round[hole - 1] = current - 1 || null;
         } else {
           const par = partnerPar(p);
@@ -584,9 +545,9 @@ function buildPartnerSteppers(area) {
     partnerList.querySelectorAll('.partner-count').forEach(el => {
       el.addEventListener('click', () => {
         const p = getSimplePlayers()[el.dataset.pidx];
-        if (p.round[hole - 1]) return;        // already scored — the steppers edit it
+        if (p.round[hole - 1]) return;
         const par = partnerPar(p);
-        if (!par) return;                     // no par data to preselect
+        if (!par) return;
         p.round[hole - 1] = par;
         saveState();
         renderPartnerScores();
@@ -595,8 +556,7 @@ function buildPartnerSteppers(area) {
   }
 }
 
-// The par a partner's current hole is preselected at. Hole pars are shared across tees
-// and categories, but the player is passed through so this follows their own card.
+// Par a partner's hole is preselected at
 function partnerPar(player) {
   const cd = getCourseData(player);
   return cd && hole <= cd.holes.length ? cd.holes[hole-1].par : null;
@@ -625,10 +585,8 @@ function updatePutterUI(animate) {
 }
 
 // ── SCORE-ONLY HELPERS ──
-// A score-only hole stores the same token array as a tracked one — plain 'Shot'
-// placeholders in place of club names — so every count, chip, Stableford point,
-// adjusted gross and scorecard cell downstream reads exactly as it always did.
-// Canonical order mirrors setPutterCount: shots, then penalties, then putts.
+// Score-only holes store 'Shot' tokens in place of clubs, so scoring reads them the same.
+// Order: shots, penalties, putts.
 function getPenaltyCount() {
   return round[hole-1].filter(c => c === 'Penalty').length;
 }
@@ -642,22 +600,20 @@ function writeHole(total, putts, pens) {
     ...Array(putts).fill('Putter')
   ];
 }
-// The total is authoritative: a breakdown that no longer fits inside it is trimmed
+// Trim the breakdown if it no longer fits the total
 function setHoleTotal(n) {
   n = Math.max(0, n);
   const putts = Math.min(getPutterCount(), n);
   const pens  = Math.min(getPenaltyCount(), n - putts);
   writeHole(n, putts, pens);
 }
-// ...and the breakdown can never move the total, only reassign strokes inside it
 function setBreakdown(putts, pens) {
   const total = holeTotal();
   putts = Math.min(Math.max(0, putts), total);
   pens  = Math.min(Math.max(0, pens), total - putts);
   writeHole(total, putts, pens);
 }
-// The par this hole is preselected at before anything is logged.
-// null on a custom course whose pars were never entered.
+// Par preselect for this hole, null if the par is unknown
 function pendingScore() {
   const cd = getCourseData(mainPlayer());
   return cd && hole <= cd.holes.length ? cd.holes[hole-1].par : null;
@@ -683,7 +639,7 @@ function updateScorePadUI() {
     : par ? 'Tap the number to take par' : 'Tap + to start counting';
   document.getElementById('scoreMinus').disabled = (total || par || 0) <= 1;
 
-  // Strokes in the total not yet claimed by the breakdown
+  // Strokes not in the breakdown
   const room = total - putts - pens;
   document.getElementById('putterCount').textContent  = putts;
   document.getElementById('penaltyCount').textContent = pens;
@@ -695,23 +651,22 @@ function updateScorePadUI() {
 
 function renderPartnerScores() {
   getSimplePlayers().forEach((player, pIdx) => {
-    // Same tee, but each player is rated under their own category
+    // Same tee, own category
     const cd = getCourseData(player);
     const countEl = document.getElementById(`partnerCount-${pIdx}`);
     const sfEl = document.getElementById(`partnerSF-${pIdx}`);
     if (!countEl) return;
 
     const gross = player.round[hole - 1];
-    // An unscored hole shows its par, dimmed, until the golfer commits to a number
+    // Unscored hole shows its par dimmed
     const par = cd && hole <= cd.holes.length ? cd.holes[hole-1].par : null;
     countEl.textContent = gross || (par ?? '—');
     countEl.classList.toggle('pending', !gross);
     const labelEl = document.getElementById(`partnerLabel-${pIdx}`);
     if (labelEl) labelEl.textContent = gross ? 'shots' : 'par';
 
-    // Stableford for this player
+    // Stableford
     if (sfEl && cd && gross) {
-      // Recalc with player's own HCP
       const playerPH = calcPlayingHCP(player.hcp, cd, HOLES);
       const pts = stablefordPoints(hole - 1, gross, playerPH, cd);
       sfEl.textContent = pts !== null ? `${pts} pts` : '';
@@ -720,8 +675,7 @@ function renderPartnerScores() {
       sfEl.textContent = '';
     }
 
-    // With a score logged, minus always works — stepping below 1 clears the hole.
-    // On the par preselect it only makes sense if there is a par above 1 to step down from.
+    // Minus clears the hole below 1. On the preselect it needs a par above 1.
     const minusBtn = document.querySelector(`.partner-minus[data-pidx="${pIdx}"]`);
     if (minusBtn) minusBtn.disabled = gross ? false : !(par > 1);
   });
@@ -743,7 +697,7 @@ function render() {
   if (trackClubs) updatePutterUI(false);
   else            updateScorePadUI();
 
-  // Par + stroke allowance label for current hole
+  // Par and strokes received
   const parEl = document.getElementById('holePar');
   if (parEl) {
     const cd = getCourseData(mainPlayer());
@@ -758,7 +712,7 @@ function render() {
     renderPartnerScores();
   }
 
-  // Show "Continue round" button on last hole if second round not yet added
+  // Offer another nine on the last hole
   const addNineBtn = document.getElementById('addNineBtn');
   addNineBtn.style.display = (hole === HOLES && !secondRound) ? '' : 'none';
 
@@ -773,7 +727,7 @@ function render() {
       ? `Tap a club to start hole ${hole}`
       : `Set your score for hole ${hole}`}</span>`;
   } else if (!trackClubs) {
-    // A row of identical 'Shot' pills would say nothing — show the breakdown instead
+    // Score-only: show the breakdown instead of a row of 'Shot' pills
     const putts = getPutterCount(), pens = getPenaltyCount();
     row.innerHTML = [
       `<span class="shot-pill">${shots.length} shot${shots.length === 1 ? '' : 's'}</span>`,
@@ -805,9 +759,7 @@ document.getElementById('next').addEventListener('click', () => { if (hole < HOL
 function activateSecondRound(newNine) {
   // newNine: 'front' | 'back' | null (null = repeat same)
   secondRound = true;
-  // Record which nine the extra holes are played on separately — overwriting
-  // selectedNine here would re-score the already-played first nine against the
-  // other nine's pars and stroke indexes.
+  // Stored separately so the first nine keeps its own pars and SI
   secondNine = newNine || selectedNine;
   HOLES = selectedHoles * 2;
   while (round.length < HOLES) round.push([]);
@@ -824,7 +776,7 @@ function closeContinueSheet() {
 document.getElementById('continueBackdrop').addEventListener('click', closeContinueSheet);
 
 document.getElementById('addNineBtn').addEventListener('click', () => {
-  // Only prompt for front/back when course has 18-hole data and we played a derived 9
+  // Ask front/back only for a nine sliced from 18
   if (selectedHoles === 9 && nineIsDerived(selectedCourse)) {
     const opts = document.getElementById('continueOpts');
     opts.innerHTML = '';
@@ -853,15 +805,14 @@ document.getElementById('addNineBtn').addEventListener('click', () => {
 // ── UNDO ──
 document.getElementById('undoBtn').addEventListener('click', () => {
   if (!round[hole-1].length) return;
-  // Score-only: take a stroke off the total rather than popping whichever token happens
-  // to be last, which would quietly drop a putt out of the breakdown as well.
+  // Score-only: take a stroke off the total, not the last token
   if (trackClubs) round[hole-1].pop();
   else            setHoleTotal(holeTotal() - 1);
   saveState();
   render();
 });
 
-// ── OVERLAY HELPERS (direct style — avoids Safari classList/flex bugs) ──
+// ── OVERLAY HELPERS (inline style avoids Safari flex bugs) ──
 function showOverlay(id) {
   var el = document.getElementById(id);
   el.style.display = 'flex';
@@ -875,8 +826,7 @@ function hideOverlay(id) {
 const PLAYER_COLORS = ['#c9a84c', '#5fb0c9', '#e0973c', '#8fbf5f', '#d1637a', '#8a7fd6'];
 let summaryPlayerIdx = 0;
 
-// Summary pills for a hole with no club detail: the total, plus whatever breakdown a
-// score-only round recorded. Partners pass no tokens and get just the total.
+// Pills for a hole with no club detail
 function countPills(tokens, gross) {
   const putts = tokens ? tokens.filter(c => c === 'Putter').length : 0;
   const pens  = tokens ? tokens.filter(c => c === 'Penalty').length : 0;
@@ -885,102 +835,327 @@ function countPills(tokens, gross) {
     + (pens  ? `<span class="sum-pill">${pens} penalt${pens === 1 ? 'y' : 'ies'}</span>` : '');
 }
 
-// Builds the hole-by-hole log + stat boxes for one player (main or partner)
-function renderSummaryFor(playerIdx) {
+// Data behind the summary on screen, read by the detail sheets
+let summaryData = null;
+
+const sumOf = arr => arr.reduce((n, x) => n + x, 0);
+const oneDp = n => (Math.round(n * 10) / 10).toFixed(1);
+function median(nums) {
+  if (!nums.length) return null;
+  const s = [...nums].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+const signed = n => (n > 0 ? '+' : '') + n;
+
+// Summary data for one player
+function buildSummaryData(playerIdx) {
   const player = players[playerIdx];
   const cd = getCourseData(player);
   const isDetailed = player.mode === 'detailed';
   const ph = cd ? calcPlayingHCP(isDetailed ? hcp : player.hcp, cd, HOLES) : 0;
 
-  let totalSF = 0, sfHoles = 0, adjGrossTotal = 0, total = 0, holesPlayed = 0;
-
-  document.getElementById('ovBody').innerHTML = Array.from({ length: HOLES }, (_, i) => {
+  const holes = Array.from({ length: HOLES }, (_, i) => {
     const shots = isDetailed ? round[i] : null;
-    const grossCount = isDetailed ? shots.length : (player.round[i] || 0);
-    if (grossCount) { total += grossCount; holesPlayed++; }
+    const gross = isDetailed ? shots.length : (player.round[i] || 0);
+    const onCourse = cd && i < cd.holes.length;
+    const par = onCourse ? cd.holes[i].par : null;
+    const pts = onCourse ? stablefordPoints(i, gross, ph, cd) : null;
+    return {
+      i, shots, gross, par, pts,
+      adj: pts !== null ? adjustedGrossForHole(i, gross, ph, cd) : null,
+      // Per hole, since the mode can change mid-round
+      hasClubs: isDetailed && shots.some(c => !NOT_A_CLUB.includes(c)),
+      putts: shots ? shots.filter(c => c === 'Putter').length : 0,
+      onCourse
+    };
+  });
+  const played = holes.filter(h => h.gross);
+  const sfHoles = holes.filter(h => h.pts !== null);
+  return {
+    player, cd, ph, isDetailed, holes, played, sfHoles,
+    total: sumOf(played.map(h => h.gross)),
+    totalSF: sumOf(sfHoles.map(h => h.pts)),
+    adjGrossTotal: sumOf(sfHoles.map(h => h.adj))
+  };
+}
 
-    // Decided per hole, not by the mode currently selected: switching mid-round leaves
-    // a card where some holes carry club names and others only 'Shot' placeholders.
-    const hasClubs = isDetailed && shots.some(c => !NOT_A_CLUB.includes(c));
-    const pills = !grossCount
-      ? '<span class="sum-none">No shots</span>'
-      : hasClubs
-        ? shots.map((c,j) => `<span class="sum-pill">#${j+1} ${c}</span>`).join('')
-        : countPills(shots, grossCount);
+function statBox(key, val, lbl, valStyle) {
+  return `<div class="stat-box" data-stat="${key}">
+    <div class="stat-val"${valStyle ? ` style="${valStyle}"` : ''}>${val}</div>
+    <div class="stat-lbl">${lbl}</div>
+  </div>`;
+}
 
-    let sfCol = '';
-    if (cd && i < cd.holes.length) {
-      const pts = stablefordPoints(i, grossCount, ph, cd);
-      if (pts !== null) {
-        totalSF += pts; sfHoles++;
-        adjGrossTotal += adjustedGrossForHole(i, grossCount, ph, cd);
-      }
-      const parLabel = cd.holes[i].par !== null ? 'Par ' + cd.holes[i].par : '';
-      sfCol = `<div class="sum-sf">
-        <div class="sum-sf-pts">${pts !== null ? pts : '—'}</div>
-        <div class="sum-sf-lbl">${parLabel}</div>
-      </div>`;
+function renderSummaryFor(playerIdx) {
+  const d = summaryData = buildSummaryData(playerIdx);
+  const { cd, isDetailed, holes, played, sfHoles, total, totalSF } = d;
+
+  // Hole grid
+  document.getElementById('ovHoles').innerHTML = holes.map(h => {
+    let cls = 'empty';
+    if (h.gross) {
+      const toPar = h.par !== null ? h.gross - h.par : null;
+      cls = toPar === null ? 'nopar' : toPar < 0 ? 'under' : toPar === 0 ? 'even' : toPar === 1 ? 'over1' : 'over2';
     }
+    const sub = h.pts !== null
+      ? `${h.pts} pt${h.pts === 1 ? '' : 's'}`
+      : h.par !== null ? `Par ${h.par}` : '';
+    return `<div class="hole-tile ${cls}" data-hole="${h.i}">
+      <div class="ht-num">${h.i + 1}</div>
+      <div class="ht-gross">${h.gross || '–'}</div>
+      <div class="ht-sub">${sub}</div>
+    </div>`;
+  }).join('');
 
-    return `<div class="sum-row">
+  // Stat boxes. Most Used only applies to tracked clubs.
+  let mostUsedBox = '';
+  if (isDetailed) {
+    const freq = clubFrequency(holes, true);
+    if (freq.length) {
+      const topCount = freq[0][1];
+      const tied = freq.filter(e => e[1] === topCount).map(e => e[0]);
+      const topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
+      mostUsedBox = statBox('clubs', topLabel, 'Most Used', topLabel.includes('/') ? 'font-size:18px' : '');
+    }
+  }
+
+  const puttTotal = sumOf(holes.map(h => h.putts));
+  const puttsBox = puttTotal ? statBox('putts', puttTotal, 'Putts') : '';
+
+  const diff = cd ? scoreDifferential(cd, sfHoles.length, d.adjGrossTotal) : null;
+  const diffBox = diff !== null ? statBox('diff', diff.toFixed(1), 'Played to (WHS)') : '';
+
+  document.getElementById('ovStats').innerHTML = cd
+    ? statBox('gross', total, 'Gross Shots')
+      + statBox('sf', sfHoles.length > 0 ? totalSF : '—', 'Stableford')
+      + statBox('holes', played.length, 'Holes Logged')
+      + mostUsedBox + puttsBox + diffBox
+    : statBox('gross', total, 'Gross Shots')
+      + statBox('net', isDetailed && hcp > 0 ? total - Math.round(hcp * HOLES / 18) : '—', 'Net Score')
+      + statBox('holes', played.length, 'Holes Logged')
+      + mostUsedBox + puttsBox;
+
+  const titleEl = document.querySelector('#summaryOverlay .ov-title');
+  if (titleEl) titleEl.textContent = isDetailed ? (selectedCourse || 'Round Summary') : `${d.player.name}'s Round`;
+}
+
+// [club, count], most used first. clubsOnly = false also counts putts and penalties.
+function clubFrequency(holes, clubsOnly) {
+  const freq = {};
+  holes.forEach(h => (h.shots || []).forEach(c => {
+    if (c === 'Shot' || (clubsOnly && NOT_A_CLUB.includes(c))) return;
+    freq[c] = (freq[c] || 0) + 1;
+  }));
+  return Object.entries(freq).sort((a, b) => b[1] - a[1]);
+}
+
+// ── DETAIL SHEET ──
+function openSheet(title, html) {
+  document.getElementById('sheetTitle').textContent = title;
+  const body = document.getElementById('sheetBody');
+  body.innerHTML = html;
+  body.scrollTop = 0;
+  const sheet = document.getElementById('sumSheet');
+  sheet.style.display = 'flex';
+  sheet.style.flexDirection = 'column';
+}
+function closeSheet() {
+  document.getElementById('sumSheet').style.display = 'none';
+}
+document.getElementById('sheetBack').addEventListener('click', closeSheet);
+
+const dtRow = (label, val, note) =>
+  `<div class="dt-row"><span>${label}${note ? `<small>${note}</small>` : ''}</span><b>${val}</b></div>`;
+const dtGroup = (title, inner) =>
+  inner ? `<div class="dt-group"><div class="lobby-label">${title}</div>${inner}</div>` : '';
+function dtBars(entries) {
+  const max = Math.max(1, ...entries.map(e => e[1]));
+  return entries.map(([label, n]) => `<div class="dt-bar">
+    <span class="dt-bar-lbl">${label}</span>
+    <span class="dt-bar-track"><span class="dt-bar-fill" style="width:${n / max * 100}%"></span></span>
+    <span class="dt-bar-n">${n}</span>
+  </div>`).join('');
+}
+// Split into nines
+function nineChunks(holes) {
+  const out = [];
+  for (let s = 0; s < holes.length; s += 9) out.push(holes.slice(s, s + 9));
+  return out;
+}
+const chunkLabel = c => `Holes ${c[0].i + 1}–${c[c.length - 1].i + 1}`;
+
+// Hole-by-hole club list, scrolled to the tapped hole
+function openHoleDetail(focusIdx) {
+  const html = summaryData.holes.map(h => {
+    const pills = !h.gross
+      ? '<span class="sum-none">No shots</span>'
+      : h.hasClubs
+        ? h.shots.map((c, j) => `<span class="sum-pill">#${j + 1} ${c}</span>`).join('')
+        : countPills(h.shots, h.gross);
+    const sfCol = h.onCourse
+      ? `<div class="sum-sf">
+          <div class="sum-sf-pts">${h.pts !== null ? h.pts : '—'}</div>
+          <div class="sum-sf-lbl">${h.par !== null ? 'Par ' + h.par : ''}</div>
+        </div>`
+      : '';
+    return `<div class="sum-row${h.i === focusIdx ? ' focus' : ''}" data-hole="${h.i}">
       <div class="sum-left">
-        <div class="sum-hnum">${i+1}</div>
-        <div class="sum-shots-count">${grossCount ? grossCount + 'sh' : ''}</div>
+        <div class="sum-hnum">${h.i + 1}</div>
+        <div class="sum-shots-count">${h.gross ? h.gross + 'sh' : ''}</div>
       </div>
       <div class="sum-pills">${pills}</div>
       ${sfCol}
     </div>`;
   }).join('');
-
-  // "Most Used" club is only meaningful for the main player — partners aren't tracked
-  // per-club, and a score-only round has no club names to rank at all
-  let mostUsedBox = '';
-  if (isDetailed) {
-    const freq = {};
-    round.forEach(shots => shots.forEach(c => {
-      if (!NOT_A_CLUB.includes(c)) freq[c] = (freq[c] || 0) + 1;
-    }));
-    const sorted = Object.entries(freq).sort((a,b) => b[1]-a[1]);
-    if (sorted.length) {
-      const topCount = sorted[0][1];
-      const tied = sorted.filter(e => e[1] === topCount).map(e => e[0]);
-      const topLabel = tied.length <= 3 ? tied.join(' / ') : '—';
-      mostUsedBox = `<div class="stat-box"><div class="stat-val" style="font-size:${topLabel.includes('/')?'18px':'28px'}">${topLabel}</div><div class="stat-lbl">Most Used</div></div>`;
-    }
-  }
-
-  // Putts are worth showing whenever any were logged — in a score-only round they are
-  // the whole payoff for keeping the optional breakdown
-  const puttTotal = isDetailed
-    ? round.reduce((n, shots) => n + shots.filter(c => c === 'Putter').length, 0)
-    : 0;
-  const puttsBox = puttTotal
-    ? `<div class="stat-box"><div class="stat-val">${puttTotal}</div><div class="stat-lbl">Putts</div></div>`
-    : '';
-
-  const diff = cd ? scoreDifferential(cd, sfHoles, adjGrossTotal) : null;
-  const diffBox = diff !== null
-    ? `<div class="stat-box"><div class="stat-val">${diff.toFixed(1)}</div><div class="stat-lbl">Played to (WHS)</div></div>`
-    : '';
-
-  const statsBoxes = cd
-    ? `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
-       <div class="stat-box"><div class="stat-val">${sfHoles > 0 ? totalSF : '—'}</div><div class="stat-lbl">Stableford</div></div>
-       <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
-       ${mostUsedBox}
-       ${puttsBox}
-       ${diffBox}`
-    : `<div class="stat-box"><div class="stat-val">${total}</div><div class="stat-lbl">Gross Shots</div></div>
-       <div class="stat-box"><div class="stat-val">${isDetailed && hcp > 0 ? total - Math.round(hcp * HOLES / 18) : '—'}</div><div class="stat-lbl">Net Score</div></div>
-       <div class="stat-box"><div class="stat-val">${holesPlayed}</div><div class="stat-lbl">Holes Logged</div></div>
-       ${mostUsedBox}
-       ${puttsBox}`;
-
-  document.getElementById('ovStats').innerHTML = statsBoxes;
-
-  const titleEl = document.querySelector('#summaryOverlay .ov-title');
-  if (titleEl) titleEl.textContent = isDetailed ? (selectedCourse || 'Round Summary') : `${player.name}'s Round`;
+  openSheet('Hole by Hole', html);
+  const row = document.querySelector(`#sheetBody .sum-row[data-hole="${focusIdx}"]`);
+  if (row) row.scrollIntoView({ block: 'center' });
 }
+
+const STAT_DETAIL = {
+  gross(d) {
+    const g = d.played.map(h => h.gross);
+    const withPar = d.played.filter(h => h.par !== null);
+    const toPar = sumOf(withPar.map(h => h.gross - h.par));
+    let html = dtGroup('Overall',
+      dtRow('Gross shots', d.total)
+      + (withPar.length ? dtRow('To par', signed(toPar), `${withPar.length} hole${withPar.length === 1 ? '' : 's'} with a par`) : '')
+      + dtRow('Average per hole', g.length ? oneDp(sumOf(g) / g.length) : '—')
+      + dtRow('Median per hole', g.length ? median(g) : '—'));
+
+    const chunks = nineChunks(d.holes);
+    if (chunks.length > 1) {
+      html += dtGroup('By nine', chunks.map(c => {
+        const p = c.filter(h => h.gross);
+        const wp = p.filter(h => h.par !== null);
+        const tp = wp.length ? ` (${signed(sumOf(wp.map(h => h.gross - h.par)))})` : '';
+        return dtRow(chunkLabel(c), p.length ? sumOf(p.map(h => h.gross)) + tp : '—');
+      }).join(''));
+    }
+
+    const parTypes = [...new Set(withPar.map(h => h.par))].sort((a, b) => a - b);
+    html += dtGroup('Average by par', parTypes.map(par => {
+      const hs = withPar.filter(h => h.par === par);
+      return dtRow(`Par ${par}`, oneDp(sumOf(hs.map(h => h.gross)) / hs.length),
+        `${hs.length} hole${hs.length === 1 ? '' : 's'}`);
+    }).join(''));
+
+    if (withPar.length) {
+      const buckets = [['Eagle+', 0], ['Birdie', 0], ['Par', 0], ['Bogey', 0], ['Double', 0], ['Triple+', 0]];
+      withPar.forEach(h => { buckets[Math.min(5, Math.max(0, h.gross - h.par + 2))][1]++; });
+      html += dtGroup('Scores', dtBars(buckets));
+    }
+    return html;
+  },
+
+  sf(d) {
+    const pts = d.sfHoles.map(h => h.pts);
+    const target = 2 * d.sfHoles.length;
+    let html = dtGroup('Overall',
+      dtRow('Stableford points', d.totalSF)
+      + dtRow('Playing handicap', d.ph)
+      + dtRow('Vs. playing to handicap', pts.length ? signed(d.totalSF - target) : '—', `${target} pts over ${d.sfHoles.length} holes`)
+      + dtRow('Average per hole', pts.length ? oneDp(d.totalSF / pts.length) : '—'));
+
+    const chunks = nineChunks(d.holes);
+    if (chunks.length > 1) {
+      html += dtGroup('By nine', chunks.map(c => {
+        const s = c.filter(h => h.pts !== null);
+        return dtRow(chunkLabel(c), s.length ? sumOf(s.map(h => h.pts)) : '—');
+      }).join(''));
+    }
+
+    if (pts.length) {
+      const buckets = [['0 pts', 0], ['1 pt', 0], ['2 pts', 0], ['3 pts', 0], ['4+ pts', 0]];
+      pts.forEach(p => { buckets[Math.min(4, p)][1]++; });
+      html += dtGroup('Points per hole', dtBars(buckets));
+    }
+    return html;
+  },
+
+  holes(d) {
+    const missing = d.holes.filter(h => !h.gross).map(h => h.i + 1);
+    return dtGroup('Logged',
+      dtRow('Holes logged', `${d.played.length} / ${HOLES}`)
+      + dtRow('Not logged yet', missing.length ? missing.join(', ') : 'None'));
+  },
+
+  clubs(d) {
+    const clubs = clubFrequency(d.holes, true);
+    const all = clubFrequency(d.holes, false);
+    const clubShots = sumOf(clubs.map(e => e[1]));
+    const clubHoles = d.holes.filter(h => h.hasClubs).length;
+    return dtGroup('Overall',
+      dtRow('Full shots (excl. putts)', clubShots)
+      + dtRow('Different clubs used', clubs.length)
+      + dtRow('Holes with club detail', clubHoles))
+      + dtGroup('Hits per club', dtBars(all));
+  },
+
+  putts(d) {
+    // Holes with known putts: tracked holes, or score-only holes with putts entered
+    const known = d.played.filter(h => h.hasClubs || h.putts > 0);
+    const p = known.map(h => h.putts);
+    const total = sumOf(p);
+    let html = dtGroup('Overall',
+      dtRow('Total putts', total)
+      + dtRow('Average per hole', p.length ? oneDp(total / p.length) : '—', `${p.length} hole${p.length === 1 ? '' : 's'} with putts logged`)
+      + dtRow('Median per hole', p.length ? median(p) : '—')
+      + dtRow('One-putts', p.filter(n => n === 1).length)
+      + dtRow('Three-putts or worse', p.filter(n => n >= 3).length));
+
+    const chunks = nineChunks(known.length ? d.holes : []);
+    if (chunks.length > 1) {
+      html += dtGroup('By nine', chunks.map(c => {
+        const k = c.filter(h => h.gross && (h.hasClubs || h.putts > 0));
+        return dtRow(chunkLabel(c), k.length ? `${sumOf(k.map(h => h.putts))} (${oneDp(sumOf(k.map(h => h.putts)) / k.length)}/hole)` : '—');
+      }).join(''));
+    }
+
+    if (p.length) {
+      const buckets = [['0 putts', 0], ['1 putt', 0], ['2 putts', 0], ['3+ putts', 0]];
+      p.forEach(n => { buckets[Math.min(3, n)][1]++; });
+      html += dtGroup('Putts per hole', dtBars(buckets));
+    }
+    return html;
+  },
+
+  diff(d) {
+    const n = d.sfHoles.length;
+    const diff = scoreDifferential(d.cd, n, d.adjGrossTotal);
+    return dtGroup('Score differential',
+      dtRow('Adjusted gross', d.adjGrossTotal, 'each hole capped at net double bogey')
+      + dtRow('Holes counted', n)
+      + dtRow('Course rating (SSS)', n === 18 ? d.cd.sss : `${d.cd.sss} → ${oneDp(d.cd.sss * n / 18)}`, n === 18 ? '' : `18-hole rating scaled to ${n} holes`)
+      + dtRow('Slope', d.cd.slope)
+      + dtRow('Played to', diff.toFixed(1), n === 18 ? '' : 'scaled up to 18 holes'))
+      + `<p class="dt-note">(113 ÷ slope) × (adjusted gross − course rating). Playing conditions (PCC) are taken as 0.</p>`;
+  },
+
+  net(d) {
+    const allowance = Math.round(hcp * HOLES / 18);
+    return dtGroup('Net score',
+      dtRow('Gross shots', d.total)
+      + dtRow('Handicap allowance', allowance, `HCP ${hcp} over ${HOLES} holes`)
+      + dtRow('Net score', hcp > 0 ? d.total - allowance : '—'));
+  }
+};
+const STAT_TITLES = {
+  gross: 'Gross Shots', sf: 'Stableford', holes: 'Holes Logged',
+  clubs: 'Club Hits', putts: 'Putts', diff: 'Played To (WHS)', net: 'Net Score'
+};
+
+document.getElementById('ovHoles').addEventListener('click', e => {
+  const tile = e.target.closest('.hole-tile');
+  if (tile) openHoleDetail(+tile.dataset.hole);
+});
+document.getElementById('ovStats').addEventListener('click', e => {
+  const box = e.target.closest('.stat-box');
+  if (!box || !summaryData) return;
+  const key = box.dataset.stat;
+  openSheet(STAT_TITLES[key], STAT_DETAIL[key](summaryData));
+});
 
 function buildPlayerSwitch() {
   const wrap = document.getElementById('ovPlayerSwitch');
@@ -1002,8 +1177,10 @@ function buildPlayerSwitch() {
 
 document.getElementById('sumBtn').addEventListener('click', () => {
   summaryPlayerIdx = 0;
+  closeSheet();
   buildPlayerSwitch();
   renderSummaryFor(0);
+  renderShareSection();
 
   const existingLb = document.querySelector('#summaryOverlay .leaderboard');
   if (existingLb) existingLb.remove();
@@ -1034,7 +1211,7 @@ document.getElementById('sumBtn').addEventListener('click', () => {
       </div>`
     ).join('');
 
-    document.getElementById('ovStats').insertAdjacentHTML('afterend',
+    document.getElementById('ovStatsSection').insertAdjacentHTML('afterend',
       `<div class="leaderboard"><div class="lobby-label" style="margin-bottom:8px">🏆 Leaderboard</div>${lbHtml}</div>`
     );
 
@@ -1054,51 +1231,192 @@ document.getElementById('sumClose').addEventListener('click', function() {
 });
 
 // ── COPY ──
-document.getElementById('copyBtn').addEventListener('click', () => {
-  const header = [
-    selectedCourse ? `Course: ${selectedCourse}` : null,
-    `Holes: ${HOLES}`,
-    hcp > 0 ? `HCP: ${hcp}` : null,
-  ].filter(Boolean).join(' | ');
-  const rows = round.map((shots, i) => {
-    if (trackClubs) {
-      return `Hole ${i+1} (${shots.length} shots): ${shots.length ? shots.join(' → ') : '—'}`;
-    }
-    // Score-only: a run of identical 'Shot' tokens is noise — print the breakdown
-    const putts = shots.filter(c => c === 'Putter').length;
-    const pens  = shots.filter(c => c === 'Penalty').length;
-    const extra = [
-      putts ? `${putts} putt${putts === 1 ? '' : 's'}` : null,
-      pens  ? `${pens} penalt${pens === 1 ? 'y' : 'ies'}` : null
-    ].filter(Boolean).join(', ');
-    return `Hole ${i+1}: ${shots.length || '—'}${extra ? ` (${extra})` : ''}`;
-  }).join('\n');
+const escHtml = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-  // Scorecard table (Hole, Par, score per player) appended at the bottom. No player is
-  // passed because this only reads hole pars, which are shared across tees and categories.
-  const cd = getCourseData();
-  const cols = ['Hole', 'Par', ...players.map(p => p.name)];
-  const tableLines = [cols.join('\t')];
-  const totals = players.map(() => 0);
+// Pipes instead of tabs so iOS doesn't turn rows of numbers into phone links
+function textTable(rows) {
+  const widths = rows[0].map((_, c) => Math.max(...rows.map(r => String(r[c]).length)));
+  return rows.map(r => r.map((v, c) =>
+    c === r.length - 1 ? String(v) : String(v).padEnd(widths[c])
+  ).join(' | ').trimEnd()).join('\n');
+}
+function htmlTable(rows) {
+  const [head, ...body] = rows;
+  return `<table border="1" cellpadding="4" style="border-collapse:collapse">`
+    + `<tr>${head.map(h => `<th>${escHtml(h)}</th>`).join('')}</tr>`
+    + body.map(r => `<tr>${r.map(v => `<td>${escHtml(v)}</td>`).join('')}</tr>`).join('')
+    + `</table>`;
+}
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  // No leading "Label:", iOS reads it as a URL and pastes a link
+  const header = [
+    selectedCourse || null,
+    `${HOLES} holes`,
+    hcp > 0 ? `HCP ${hcp}` : null,
+  ].filter(Boolean).join(' · ');
+
+  // Shots per hole
+  const shotRows = [['Hole', 'Shots', 'Putts', 'Clubs used']];
+  let shotTotal = 0, puttTotal = 0;
+  round.forEach((shots, i) => {
+    const putts = shots.filter(c => c === 'Putter').length;
+    const clubs = shots.filter(c => c !== 'Putter' && c !== 'Shot');
+    shotTotal += shots.length; puttTotal += putts;
+    shotRows.push([i + 1, shots.length || '', shots.length ? putts : '', clubs.length ? clubs.join(' → ') : '']);
+  });
+  shotRows.push(['Total', shotTotal || '', puttTotal || '', '']);
+
+  // Scorecard with Stableford for each player
+  const cards = players.map((_, idx) => buildSummaryData(idx));
+  const cardRows = [['Hole', 'Par', ...players.flatMap((p, idx) =>
+    idx === 0 ? ['Shots', 'Stableford'] : [p.name, `${p.name} Stableford`])]];
   let parTotal = 0;
   for (let i = 0; i < HOLES; i++) {
-    const par = cd && i < cd.holes.length && cd.holes[i].par !== null ? cd.holes[i].par : '';
-    if (par !== '') parTotal += par;
-    const scores = players.map((p, pIdx) => {
-      const gross = p.mode === 'detailed' ? round[i].length : p.round[i];
-      if (gross) totals[pIdx] += gross;
-      return gross || '';
-    });
-    tableLines.push([i + 1, par, ...scores].join('\t'));
+    const par = cards[0].holes[i].par;
+    if (par !== null) parTotal += par;
+    cardRows.push([i + 1, par ?? '', ...cards.flatMap(c => {
+      const h = c.holes[i];
+      return [h.gross || '', h.pts ?? ''];
+    })]);
   }
-  tableLines.push(['Total', parTotal || '', ...totals.map(t => t || '')].join('\t'));
+  cardRows.push(['Total', parTotal || '', ...cards.flatMap(c =>
+    [c.total || '', c.sfHoles.length ? c.totalSF : ''])]);
 
-  const text = (header ? `${header}\n\n${rows}` : rows) + `\n\n${tableLines.join('\n')}`;
-  navigator.clipboard.writeText(text).then(() => {
+  const text = [header, textTable(shotRows), textTable(cardRows)].join('\n\n');
+  const html = `<p>${escHtml(header)}</p>${htmlTable(shotRows)}<br>${htmlTable(cardRows)}`;
+
+  // Copy as HTML too so apps paste a real table
+  const write = typeof ClipboardItem !== 'undefined' && navigator.clipboard.write
+    ? navigator.clipboard.write([new ClipboardItem({
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+        'text/html':  new Blob([html], { type: 'text/html' })
+      })]).catch(() => navigator.clipboard.writeText(text))
+    : navigator.clipboard.writeText(text);
+  write.then(() => {
     const b = document.getElementById('copyBtn');
     b.textContent = '✓ Copied to clipboard!';
     setTimeout(() => b.textContent = 'Copy to Clipboard', 2000);
   });
+});
+
+// ── LIVE SHARE ──
+// While a code is active, every save is pushed to Supabase (see share.js, supabase.sql)
+// Declared so saveState can call scheduleShareSync before this section has run
+var shareTimer = null;
+function shareCode()   { return localStorage.getItem('gct_sharecode'); }
+function shareSecret() { return localStorage.getItem('gct_sharesecret'); }
+const shareUrl = code => new URL(`view.html?code=${formatCode(code)}`, location.href).href;
+const clockTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+// Scored per player on the phone, so the web page only has to display it
+function sharePayload() {
+  return {
+    v: 1,
+    course: selectedCourse || null,
+    hole,
+    trackClubs,
+    players: players.map((p, idx) => {
+      const d = buildSummaryData(idx);
+      return {
+        name: p.name,
+        hcp: d.isDetailed ? hcp : p.hcp,
+        ph: d.cd ? d.ph : null,
+        holes: d.holes.map(h => ({
+          par: h.par,
+          gross: h.gross || null,
+          pts: h.pts,
+          shots: h.shots && h.shots.length ? h.shots : null
+        }))
+      };
+    })
+  };
+}
+
+function setShareStatus(text) {
+  document.getElementById('shareStatus').textContent = text;
+}
+
+async function pushShare() {
+  const code = shareCode();
+  if (!code) return;
+  try {
+    const ok = await supabaseRpc('share_round', { p_code: code, p_secret: shareSecret(), p_data: sharePayload() });
+    setShareStatus(ok ? `synced ${clockTime()}` : 'code rejected');
+  } catch (e) {
+    setShareStatus('offline, will retry');
+  }
+}
+
+function scheduleShareSync() {
+  if (!shareEnabled() || !shareCode()) return;
+  clearTimeout(shareTimer);
+  shareTimer = setTimeout(pushShare, 2000);
+}
+window.addEventListener('online', scheduleShareSync);
+
+function renderShareSection() {
+  const section = document.getElementById('ovShareSection');
+  section.style.display = shareEnabled() ? '' : 'none';
+  if (!shareEnabled()) return;
+  const code = shareCode();
+  document.getElementById('ovShare').innerHTML = code
+    ? `<div class="share-code">${formatCode(code)}</div>
+       <div class="share-hint">${escHtml(shareUrl(code))}</div>
+       <div class="share-actions">
+         <button class="share-btn" data-share="link">Share link</button>
+         <button class="share-btn share-stop" data-share="stop">Stop sharing</button>
+       </div>`
+    : `<button class="share-btn" data-share="start">Get a live code</button>
+       <div class="share-hint">Anyone with the code can follow this round on the web</div>`;
+  if (!code) setShareStatus('');
+}
+
+async function startSharing(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Creating code…';
+  const secret = randomSecret();
+  try {
+    // Retry on the rare code that's already taken
+    for (let i = 0; i < 3; i++) {
+      const code = randomCode();
+      if (await supabaseRpc('share_round', { p_code: code, p_secret: secret, p_data: sharePayload() })) {
+        localStorage.setItem('gct_sharecode', code);
+        localStorage.setItem('gct_sharesecret', secret);
+        renderShareSection();
+        setShareStatus(`synced ${clockTime()}`);
+        return;
+      }
+    }
+  } catch (e) {}
+  btn.disabled = false;
+  btn.textContent = 'No connection, try again';
+}
+
+async function stopSharing() {
+  if (!confirm('Stop sharing? The code will stop working.')) return;
+  try {
+    await supabaseRpc('unshare_round', { p_code: shareCode(), p_secret: shareSecret() });
+  } catch (e) {
+    alert("Couldn't reach the server. Try again when you have signal.");
+    return;
+  }
+  localStorage.removeItem('gct_sharecode');
+  localStorage.removeItem('gct_sharesecret');
+  renderShareSection();
+}
+
+document.getElementById('ovShare').addEventListener('click', e => {
+  const btn = e.target.closest('[data-share]');
+  if (!btn) return;
+  const action = btn.dataset.share;
+  if (action === 'start') startSharing(btn);
+  if (action === 'stop') stopSharing();
+  if (action === 'link') {
+    const url = shareUrl(shareCode());
+    if (navigator.share) navigator.share({ title: 'Live round', url }).catch(() => {});
+    else navigator.clipboard.writeText(url).then(() => { btn.textContent = '✓ Link copied'; });
+  }
 });
 
 // ── NEW ROUND ──
@@ -1125,6 +1443,57 @@ document.getElementById('newRoundBtn').addEventListener('click', () => {
   openLobby();
 });
 
+// ── LAST ROUND ──
+// Tee off replaces the round, so the one being left is kept for a restore
+const ROUND_KEYS = [
+  'gct_round', 'gct_hole', 'gct_holes', 'gct_selectedholes', 'gct_secondround',
+  'gct_selectednine', 'gct_secondnine', 'gct_selectedstart', 'gct_selectedtee',
+  'gct_course', 'gct_hcp', 'gct_custompars', 'gct_customsss', 'gct_customslope',
+  'gct_trackclubs', 'gct_players', 'gct_sharecode', 'gct_sharesecret'
+];
+let lobbySnapshot = null; // round in progress when the lobby opened
+
+function hasRoundData() {
+  return roundStarted() || getSimplePlayers().some(p => p.round && p.round.some(Boolean));
+}
+
+function snapshotRound() {
+  saveState();
+  const data = {};
+  ROUND_KEYS.forEach(k => { data[k] = localStorage.getItem(k); });
+  return { savedAt: Date.now(), data };
+}
+
+function readLastRound() {
+  try { return JSON.parse(localStorage.getItem('gct_lastround')); } catch (e) { return null; }
+}
+
+function buildRestoreBtn() {
+  const btn = document.getElementById('restoreBtn');
+  const last = readLastRound();
+  if (!last) { btn.style.display = 'none'; return; }
+  let shots = [];
+  try { shots = JSON.parse(last.data.gct_round) || []; } catch (e) {}
+  const logged = shots.filter(h => h.length).length;
+  const date = new Date(last.savedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const info = [last.data.gct_course, `${logged}/${shots.length} holes`, date].filter(Boolean).join(' · ');
+  btn.innerHTML = `↩ Restore last round<small>${escHtml(info)}</small>`;
+  btn.style.display = '';
+}
+
+document.getElementById('restoreBtn').addEventListener('click', () => {
+  const last = readLastRound();
+  if (!last) return;
+  // Swap, so the round being replaced can be restored in turn
+  if (lobbySnapshot) localStorage.setItem('gct_lastround', JSON.stringify(lobbySnapshot));
+  else localStorage.removeItem('gct_lastround');
+  ROUND_KEYS.forEach(k => {
+    if (last.data[k] === null) localStorage.removeItem(k);
+    else localStorage.setItem(k, last.data[k]);
+  });
+  location.reload();
+});
+
 // ── LOBBY ──
 function holeOptionsFor(course) {
   const counts = Object.keys(COURSES)
@@ -1140,20 +1509,17 @@ function holeOptionsFor(course) {
   return [...set].sort((a, b) => a - b);
 }
 
-// Returns true if 9 holes for this course is derived from an 18-hole entry (not explicit, not unknown)
+// True if 9 holes are sliced from an 18-hole entry
 function nineIsDerived(course) {
   const entries = Object.keys(COURSES).filter(k =>
     k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course
   );
-  if (entries.length === 0) return false; // unknown/custom course — no data to derive from
+  if (entries.length === 0) return false;
   const hasExplicit9 = entries.some(k => COURSES[k].holes.length === 9);
   return !hasExplicit9;
 }
 
-// Returns true if 18 holes for this course means playing its nine twice, because the
-// course has a 9-hole entry and no 18-hole one. The duplication is the same one the
-// "add another nine" button applies mid-round — withSecondRound repeats the hole list
-// and leaves par/ratingPar/sss/slope at the course's rating values.
+// True if 18 holes means playing a 9-hole course twice
 function eighteenIsDoubledNine(course) {
   const entries = Object.keys(COURSES).filter(k =>
     k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course
@@ -1162,30 +1528,25 @@ function eighteenIsDoubledNine(course) {
       && !entries.some(k => COURSES[k].holes.length === 18);
 }
 
-// The hole count the lobby is showing as picked. selectedHoles is always one lap, so a
-// doubled nine is stored as 9 + lobbySecondRound rather than as selectedHoles = 18.
+// Hole count shown in the lobby (a doubled nine shows as 18)
 function lobbyHoleChoice() {
   return selectedHoles * (lobbySecondRound ? 2 : 1);
 }
 
-// Returns true when the course has an 18-hole entry (so front/back start matters)
+// True if the course has an 18-hole entry
 function hasFullRound(course) {
   return Object.keys(COURSES).some(k =>
     k.replace(/\s*-\s*\d+\s*Hole$/i, '') === course && COURSES[k].holes.length === 18
   );
 }
 
-// The COURSES entry this round draws its ratings from. Deliberately does NOT go through
-// buildCourseData: that needs selectedNine to resolve a nine sliced out of an 18-hole
-// card, and falls back to the custom-course shape until one is picked. The tee and
-// category pickers are built before the front/back choice exists, so going through it
-// made a rated course look unrated and silently discarded the chosen tee.
+// COURSES entry the ratings come from. Not via buildCourseData, which needs selectedNine.
 function courseEntry() {
   const explicit = Object.values(COURSES).find(c =>
     courseBaseName(c) === selectedCourse && c.holes.length === selectedHoles
   );
   if (explicit) return explicit;
-  // A nine derived from an 18-hole entry is rated off that entry, whichever nine it is
+  // A sliced nine is rated off the 18-hole entry
   if (selectedHoles === 9) {
     return Object.values(COURSES).find(c =>
       courseBaseName(c) === selectedCourse && c.holes.length === 18
@@ -1194,9 +1555,7 @@ function courseEntry() {
   return null;
 }
 
-// Tee colours and categories follow the hole count: St Genis lists seven colours for its
-// nine, but its 5-hole compact entry lists only its own. Both are empty for a course with
-// no `tees`, which is how the pickers know to stay hidden.
+// Tees and categories for the chosen hole count, empty if the course has no tees
 function teeColoursFor() {
   const c = courseEntry();
   return c && c.tees ? [...new Set(c.tees.map(t => t.colour))] : [];
@@ -1207,27 +1566,26 @@ function categoriesFor() {
   return c && c.tees ? [...new Set(c.tees.filter(t => t.players).map(t => t.players))] : [];
 }
 
-// The single detailed player — 'You'. Everyone else is a simple-mode partner.
+// The detailed player ('You'). Everyone else is a partner.
 function mainPlayer() {
   return players.find(p => p.mode === 'detailed') || players[0];
 }
 
-// Only worth showing when there is a choice to make: one tee, or none listed, needs no
-// picker, and the resolver falls back to the course's defaultTee anyway.
+// Only shown when there's more than one tee
 function buildTeeOpts() {
   const wrap    = document.getElementById('teeOpts');
   const section = document.getElementById('teeSection');
   const colours = teeColoursFor();
   wrap.innerHTML = '';
   if (colours.length < 2) {
-    // Drop a tee left over from another course or hole count
+    // Drop a tee from another course or hole count
     if (!colours.includes(selectedTee)) selectedTee = null;
     section.style.display = 'none';
     return;
   }
   const course = courseEntry();
   if (!colours.includes(selectedTee)) selectedTee = (course && course.defaultTee) || colours[0];
-  // A course can carry seven or more tees — far too many to sit as pills in one row
+  // Too many tees for pills, use a dropdown
   const sel = document.createElement('select');
   sel.className = 'lobby-custom-input';
   sel.id = 'teeSelect';
@@ -1238,15 +1596,14 @@ function buildTeeOpts() {
   sel.addEventListener('change', () => {
     selectedTee = sel.value;
     saveState();
-    buildPlayerLobby();   // partner rows show this tee as their "default" option
+    buildPlayerLobby();
     updateLobbyStartBtn();
   });
   wrap.appendChild(sel);
   section.style.display = '';
 }
 
-// Category for the detailed player, defaulting to DEFAULT_CATEGORY. Acts as a radio:
-// there is always exactly one selected, so clicking the current one is a no-op.
+// Category for the detailed player, always exactly one selected
 function buildCategoryOpts() {
   const wrap = document.getElementById('categoryOpts');
   const row  = document.getElementById('categoryRow');
@@ -1270,18 +1627,15 @@ function buildCategoryOpts() {
 }
 
 // ── TRACKING SHEET ──
-// Clubs vs score-only, asked once at the first tee rather than taking a box in the
-// lobby. Both modes write the same token array per hole, so the choice only changes
-// what the pad logs and how it is displayed — never how anything is scored.
-// The pair of mode buttons, shared by the first-tee sheet and the settings overlay so
-// the two can never drift. `afterPick` is what the host does once the choice is stored.
+// Clubs vs score-only, asked at the first tee.
+// Mode buttons are shared with the settings overlay.
 function trackOptionButtons(afterPick) {
   return [
     { label: '⛳ Clubs & Shots', val: true,  sub: 'A club for every shot' },
     { label: '🔢 Score Only',   val: false, sub: 'Just a total per hole' }
   ].map(({ label, val, sub }) => {
     const btn = document.createElement('button');
-    // The current choice is highlighted, so dismissing the sheet keeps it
+    // Current choice is highlighted, so dismissing keeps it
     btn.className = 'lobby-opt' + (trackClubs === val ? ' sel' : '');
     btn.style.cssText = 'flex:1;padding:14px 10px';
     btn.innerHTML = `<div style="font-size:15px">${label}</div>
@@ -1500,9 +1854,7 @@ function buildHoleOpts(course) {
   const parPrompt  = document.getElementById('parPrompt');
   const parGrid    = document.getElementById('parGrid');
   const options = holeOptionsFor(course);
-  // The choice is held as one lap plus a repeat flag, but 18 means "the nine twice" on
-  // some courses and a real 18-hole card on others — so re-express it for this course
-  // before validating, or switching courses leaves a doubled nine on an 18-hole entry.
+  // Re-express 18 for this course (doubled nine or real 18) before validating
   if (selectedHoles > 0) {
     const choice = lobbyHoleChoice();
     lobbySecondRound = choice === 18 && eighteenIsDoubledNine(course);
@@ -1524,8 +1876,7 @@ function buildHoleOpts(course) {
     btn.className = 'lobby-opt' + (lobbyHoleChoice() === n ? ' sel' : '');
     btn.textContent = n + ' holes';
     btn.addEventListener('click', () => {
-      // 18 on a 9-hole course is that nine played twice, so keep selectedHoles at one
-      // lap and flag the repeat — same shape as the mid-round "add another nine".
+      // 18 on a 9-hole course: one lap plus the repeat flag
       lobbySecondRound = n === 18 && eighteenIsDoubledNine(selectedCourse);
       selectedHoles = lobbySecondRound ? 9 : n;
       selectedNine = null;
@@ -1557,7 +1908,7 @@ function buildHoleOpts(course) {
       }
       buildTeeOpts();
       buildCategoryOpts();
-      buildPlayerLobby();   // partner tee/category rows follow the new hole count
+      buildPlayerLobby();
       updateLobbyStartBtn();
     });
     holesOpts.appendChild(btn);
@@ -1584,12 +1935,16 @@ function buildHoleOpts(course) {
 function buildPlayerLobby() {
   const wrap = document.getElementById('playersLobby');
   wrap.innerHTML = '<div class="lobby-label">Playing Partners (optional)</div>';
+  buildPartnerRows(wrap, buildPlayerLobby);
+}
 
+// Partner rows with add/remove, used by the lobby and the settings overlay
+function buildPartnerRows(wrap, rebuild) {
   const cats    = categoriesFor();
   const colours = teeColoursFor();
   const cap = w => w.charAt(0).toUpperCase() + w.slice(1);
   getSimplePlayers().forEach((p, i) => {
-    // A tee left over from another course or hole count is no longer selectable
+    // Tee from another course or hole count
     if (p.tee && !colours.includes(p.tee)) p.tee = null;
     if (!p.category) p.category = DEFAULT_CATEGORY;
     const teeField = colours.length < 2 ? '' : `
@@ -1628,11 +1983,11 @@ function buildPlayerLobby() {
       round: Array(HOLES || 18).fill(null)
     });
     saveState();
-    buildPlayerLobby();
+    rebuild();
   });
   wrap.appendChild(addBtn);
 
-  // Bind inputs — the category picker is a <select>, so match on the attribute not the tag
+  // Category picker is a <select>
   wrap.querySelectorAll('[data-field]').forEach(inp => {
     inp.addEventListener(inp.tagName === 'SELECT' ? 'change' : 'input', () => {
       const p = getSimplePlayers()[inp.dataset.pidx];
@@ -1647,17 +2002,19 @@ function buildPlayerLobby() {
   // Bind remove
   wrap.querySelectorAll('.pill-x[data-pidx]').forEach(btn => {
     btn.addEventListener('click', () => {
-      const simpleIdx = parseInt(btn.dataset.pidx);
-      const globalIdx = players.indexOf(getSimplePlayers()[simpleIdx]);
-      players.splice(globalIdx, 1);
+      const p = getSimplePlayers()[parseInt(btn.dataset.pidx)];
+      if (p.round.some(Boolean) && !confirm(`Remove ${p.name}? Their scores will be lost.`)) return;
+      players.splice(players.indexOf(p), 1);
       saveState();
-      buildPlayerLobby();
+      rebuild();
     });
   });
 }
 
 function openLobby() {
-  // A round already doubling its nine should show 18 selected, not 9
+  lobbySnapshot = hasRoundData() ? snapshotRound() : null;
+  buildRestoreBtn();
+  // Doubled nine shows as 18
   lobbySecondRound = secondRound && eighteenIsDoubledNine(selectedCourse);
   // Rebuild course buttons
   const courseOpts = document.getElementById('courseOpts');
@@ -1705,7 +2062,7 @@ function openLobby() {
     updateLobbyStartBtn();
   });
 
-  // Hole buttons — built based on current course
+  // Hole buttons for the current course
   buildHoleOpts(selectedCourse);
 
   // HCP input
@@ -1713,8 +2070,7 @@ function openLobby() {
   hcpInput.value = hcp;
   hcpInput.oninput = () => {
     const v = parseInt(hcpInput.value, 10);
-    // Blank box falls back to the maximum, not to anyone's actual handicap — a real one
-    // is only ever remembered from what was entered last time, via gct_hcp.
+    // Blank falls back to the max handicap
     hcp = isNaN(v) ? DEFAULT_HCP : Math.min(54, Math.max(0, v));
   };
 
@@ -1746,11 +2102,17 @@ function updateLobbyStartBtn() {
 
 document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   if (!selectedCourse || !selectedHoles) return;
+  if (lobbySnapshot) {
+    localStorage.setItem('gct_lastround', JSON.stringify(lobbySnapshot));
+    lobbySnapshot = null;
+  }
+  // A new round gets its own code
+  localStorage.removeItem('gct_sharecode');
+  localStorage.removeItem('gct_sharesecret');
   const hcpInput = document.getElementById('hcpInput');
   const v = parseInt(hcpInput.value, 10);
   hcp = isNaN(v) ? DEFAULT_HCP : Math.min(54, Math.max(0, v));
-  // A doubled nine starts already in its second round, exactly as if the nine had been
-  // played and "add another nine" pressed at the turn.
+  // A doubled nine starts in its second round
   secondRound = lobbySecondRound;
   secondNine  = lobbySecondRound ? selectedNine : null;
   HOLES = selectedHoles * (lobbySecondRound ? 2 : 1);
@@ -1762,8 +2124,7 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   buildStrip();
   buildClubButtons();
   render();
-  // Asked at the first tee, where you actually know what kind of round this is.
-  // The pad behind it is already showing last round's mode, highlighted in the sheet.
+  // Ask tracking mode at the first tee
   openTrackSheet();
 });
 
@@ -1772,14 +2133,13 @@ function buildSettingsUI() {
   const scroll = document.getElementById('settingsScroll');
   scroll.innerHTML = '';
 
-  // Tracking mode, switchable at any point in the round: both modes store the same
-  // token array per hole, so flipping it never loses a score already logged.
+  // Tracking mode can change mid-round without losing scores
   const trackGroup = document.createElement('div');
   trackGroup.className = 'settings-group';
   trackGroup.innerHTML = `<div class="settings-group-title">Tracking</div>`;
   const trackRow = document.createElement('div');
   trackRow.style.cssText = 'display:flex;gap:10px';
-  // Re-rendering moves the highlight; closeSettings is what applies it to the pad
+  // closeSettings applies the change to the pad
   trackOptionButtons(buildSettingsUI).forEach(btn => trackRow.appendChild(btn));
   trackGroup.appendChild(trackRow);
   scroll.appendChild(trackGroup);
@@ -1790,6 +2150,16 @@ function buildSettingsUI() {
     modeNote.innerHTML = `<span>🔢</span> Your bag isn't used while scoring by total`;
     scroll.appendChild(modeNote);
   }
+
+  const partnerGroup = document.createElement('div');
+  partnerGroup.className = 'settings-group';
+  const rebuildPartners = () => {
+    partnerGroup.innerHTML = '<div class="settings-group-title">Playing Partners</div>';
+    buildPartnerRows(partnerGroup, rebuildPartners);
+  };
+  rebuildPartners();
+
+  scroll.appendChild(partnerGroup);
 
   Object.entries(ALL_CLUBS).forEach(([groupName, clubs]) => {
     const group = document.createElement('div');
@@ -1863,7 +2233,7 @@ if (roundStarted()) {
   buildClubButtons();
   render();
 } else {
-  // No active round — show lobby
+  // No active round, show lobby
   buildStrip();
   buildClubButtons();
   render();

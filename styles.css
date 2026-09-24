@@ -369,9 +369,40 @@
   .player-tab:active { transform: scale(0.94); }
   .ov-body { flex: 1; overflow-y: auto; scrollbar-width: none; }
   .ov-body::-webkit-scrollbar { display: none; }
+  .sum-section { margin-bottom: 18px; }
+  .sum-sec-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 8px;
+  }
+  .sum-sec-hint { font-size: 10px; color: rgba(255,255,255,0.3); font-style: italic; }
+
+  /* Hole grid, coloured by score to par */
+  .hole-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 6px;
+  }
+  .hole-tile {
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    border-radius: 9px; padding: 5px 2px 6px; text-align: center;
+    cursor: pointer; user-select: none; transition: transform 0.1s;
+  }
+  .hole-tile:active { transform: scale(0.93); }
+  .ht-num { font-size: 9px; font-weight: 700; color: var(--cream-dim); letter-spacing: 0.5px; }
+  .ht-gross { font-family: 'Bebas Neue', sans-serif; font-size: 22px; line-height: 1.05; color: var(--cream); }
+  .ht-sub { font-size: 9px; color: var(--gold); min-height: 11px; }
+  .hole-tile.empty .ht-gross { color: rgba(255,255,255,0.2); }
+  .hole-tile.under { background: rgba(201,168,76,0.18); border-color: var(--gold); }
+  .hole-tile.under .ht-gross { color: var(--gold-bright); }
+  .hole-tile.even  { background: rgba(61,112,51,0.3); border-color: rgba(77,143,65,0.5); }
+  .hole-tile.over1 { background: rgba(255,255,255,0.06); }
+  .hole-tile.over2 { background: rgba(176,48,32,0.14); border-color: rgba(176,48,32,0.4); }
+
   .sum-row {
     display: flex; align-items: flex-start; gap: 12px;
     padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .sum-row.focus {
+    background: rgba(201,168,76,0.1); border-radius: 8px;
+    margin: 0 -8px; padding: 9px 8px;
   }
   .sum-left { text-align: right; min-width: 28px; flex-shrink: 0; }
   .sum-hnum { font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--gold); line-height: 1; }
@@ -391,16 +422,64 @@
     font-family: 'Bebas Neue', sans-serif; font-size: 20px; color: var(--gold); line-height: 1;
   }
   .sum-sf-lbl { font-size: 8px; color: var(--cream-dim); letter-spacing: 0.5px; }
-  .ov-stats { flex-shrink: 0; padding: 10px 0 0; display: flex; flex-wrap: wrap; gap: 10px; }
+  .ov-stats { display: flex; flex-wrap: wrap; gap: 10px; }
   .stat-box {
-    flex: 1 1 40%; background: rgba(255,255,255,0.04);
+    position: relative; flex: 1 1 40%; background: rgba(255,255,255,0.04);
     border: 1px solid var(--border);
     border-radius: 10px; padding: 10px; text-align: center;
+    cursor: pointer; user-select: none; transition: background 0.1s;
   }
+  .stat-box::after {
+    content: '›'; position: absolute; top: 4px; right: 9px;
+    font-size: 16px; color: rgba(201,168,76,0.45);
+  }
+  .stat-box:active { background: rgba(255,255,255,0.08); }
   .stat-val { font-family: 'Bebas Neue', sans-serif; font-size: 28px; color: var(--gold); line-height: 1; }
   .stat-lbl { font-size: 10px; color: var(--cream-dim); letter-spacing: 1px; margin-top: 2px; }
 
-  .leaderboard { flex-shrink: 0; margin-top: 12px; }
+  .leaderboard { margin-bottom: 6px; }
+
+  /* Live share */
+  .share-code {
+    font-family: 'Bebas Neue', sans-serif; font-size: 44px; letter-spacing: 6px;
+    color: var(--gold-bright); text-align: center; line-height: 1.1;
+  }
+  .share-hint { font-size: 11px; color: var(--cream-dim); text-align: center; margin: 4px 0 10px; word-break: break-all; }
+  .share-actions { display: flex; gap: 8px; }
+  .share-btn {
+    flex: 1; width: 100%;
+    background: rgba(201,168,76,0.1); border: 1px solid var(--border-gold);
+    border-radius: 12px; color: var(--gold);
+    font-family: 'Karla', sans-serif; font-size: 14px; font-weight: 700;
+    padding: 12px; cursor: pointer;
+  }
+  .share-btn:active { background: rgba(201,168,76,0.22); }
+  .share-btn:disabled { opacity: 0.6; }
+  .share-stop { background: rgba(176,48,32,0.1); border-color: rgba(176,48,32,0.3); color: #e07060; }
+
+  /* Detail sheet over the summary */
+  .sum-sheet {
+    position: absolute; inset: 0; z-index: 2; display: none;
+    background: rgb(8,13,7);
+    padding: 22px 20px calc(24px + env(safe-area-inset-bottom));
+  }
+  .sheet-body { flex: 1; overflow-y: auto; scrollbar-width: none; }
+  .sheet-body::-webkit-scrollbar { display: none; }
+  .dt-group { margin-bottom: 20px; }
+  .dt-group .lobby-label { margin-bottom: 6px; }
+  .dt-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 14px;
+  }
+  .dt-row small { display: block; font-size: 10px; color: var(--cream-dim); margin-top: 1px; }
+  .dt-row b { font-family: 'Bebas Neue', sans-serif; font-weight: 400; font-size: 22px; color: var(--gold); text-align: right; }
+  .dt-bar { display: flex; align-items: center; gap: 10px; padding: 5px 0; font-size: 13px; }
+  .dt-bar-lbl { width: 64px; flex-shrink: 0; font-weight: 600; }
+  .dt-bar-track { flex: 1; height: 10px; border-radius: 5px; background: rgba(255,255,255,0.05); overflow: hidden; }
+  .dt-bar-fill { display: block; height: 100%; border-radius: 5px; background: var(--turf); }
+  .dt-bar-n { width: 24px; text-align: right; color: var(--gold); font-weight: 700; }
+  .dt-note { font-size: 11px; color: var(--cream-dim); line-height: 1.5; }
   .lb-row {
     display: flex; align-items: center; gap: 10px;
     padding: 9px 12px; margin-bottom: 6px;
@@ -497,6 +576,15 @@
   }
   .lobby-scroll::-webkit-scrollbar { display: none; }
   .lobby-section { display: flex; flex-direction: column; gap: 10px; }
+  .restore-btn {
+    flex-shrink: 0; width: 100%;
+    background: rgba(201,168,76,0.08); border: 1.5px dashed var(--border-gold);
+    border-radius: 12px; color: var(--gold);
+    font-family: 'Karla', sans-serif; font-size: 14px; font-weight: 700;
+    padding: 12px; cursor: pointer; text-align: center;
+  }
+  .restore-btn small { display: block; margin-top: 3px; font-size: 11px; font-weight: 600; color: var(--cream-dim); }
+  .restore-btn:active { background: rgba(201,168,76,0.18); }
   .lobby-label {
     font-size: 9px; font-weight: 700; letter-spacing: 2px;
     text-transform: uppercase; color: rgba(201,168,76,0.55);
@@ -526,10 +614,7 @@
     font-size: 15px; font-weight: 600;
     padding: 13px 14px; width: 100%; outline: none;
   }
-  /* A native dropdown paints its popup list with the field's own background. Ours is
-     near-transparent, so the list came out cream-on-white and unreadable — the options
-     need an explicit opaque fill of their own. The caret is drawn here because
-     appearance:none removes the platform one. */
+  /* Opaque options so the native list is readable. Custom caret since appearance:none removes it. */
   select.lobby-custom-input {
     appearance: none; -webkit-appearance: none; cursor: pointer;
     background-color: rgba(255,255,255,0.05);
@@ -617,3 +702,35 @@
   .footnote a:hover {
     text-decoration: underline;
   }
+
+  /* ── LIVE VIEW PAGE ── */
+  html.view, html.view body { height: auto; overflow: auto; }
+  .view-wrap {
+    position: relative; z-index: 1;
+    max-width: 720px; margin: 0 auto; padding: 20px 16px 48px;
+  }
+  .view-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .view-brand {
+    font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: 2px;
+    color: var(--gold); text-decoration: none;
+  }
+  .view-form { display: flex; gap: 8px; flex: 1; max-width: 340px; min-width: 240px; }
+  .view-form .lobby-custom-input { flex: 1; padding: 10px 12px; text-transform: uppercase; }
+  .view-form .share-btn { flex: 0 0 auto; width: auto; padding: 10px 18px; }
+  .view-status { font-size: 13px; color: var(--cream-dim); margin-bottom: 12px; }
+  .view-status:empty { display: none; }
+  .view-head { margin-bottom: 14px; }
+  .view-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--cream-dim); margin-top: 4px; }
+  .view-live { width: 8px; height: 8px; border-radius: 50%; background: var(--turf); box-shadow: 0 0 0 3px rgba(77,143,65,0.25); }
+  .view-stat { flex: 1 1 18%; min-width: 96px; cursor: default; }
+  .view-stat::after { content: none; }
+  .view-table-wrap { overflow-x: auto; }
+  .view-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .view-table th, .view-table td {
+    padding: 6px 8px; text-align: center; white-space: nowrap;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .view-table th { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+  .view-table .pts { color: var(--gold); }
+  .view-table tr.now td { background: rgba(201,168,76,0.1); }
+  .view-table tr.total td { font-weight: 700; border-top: 1px solid var(--border-gold); }
