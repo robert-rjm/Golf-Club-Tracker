@@ -1322,6 +1322,57 @@ document.getElementById('newRoundBtn').addEventListener('click', () => {
   openLobby();
 });
 
+// ── LAST ROUND ──
+// Tee off replaces the round, so the one being left is kept for a restore
+const ROUND_KEYS = [
+  'gct_round', 'gct_hole', 'gct_holes', 'gct_selectedholes', 'gct_secondround',
+  'gct_selectednine', 'gct_secondnine', 'gct_selectedstart', 'gct_selectedtee',
+  'gct_course', 'gct_hcp', 'gct_custompars', 'gct_customsss', 'gct_customslope',
+  'gct_trackclubs', 'gct_players'
+];
+let lobbySnapshot = null; // round in progress when the lobby opened
+
+function hasRoundData() {
+  return roundStarted() || getSimplePlayers().some(p => p.round && p.round.some(Boolean));
+}
+
+function snapshotRound() {
+  saveState();
+  const data = {};
+  ROUND_KEYS.forEach(k => { data[k] = localStorage.getItem(k); });
+  return { savedAt: Date.now(), data };
+}
+
+function readLastRound() {
+  try { return JSON.parse(localStorage.getItem('gct_lastround')); } catch (e) { return null; }
+}
+
+function buildRestoreBtn() {
+  const btn = document.getElementById('restoreBtn');
+  const last = readLastRound();
+  if (!last) { btn.style.display = 'none'; return; }
+  let shots = [];
+  try { shots = JSON.parse(last.data.gct_round) || []; } catch (e) {}
+  const logged = shots.filter(h => h.length).length;
+  const date = new Date(last.savedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  const info = [last.data.gct_course, `${logged}/${shots.length} holes`, date].filter(Boolean).join(' · ');
+  btn.innerHTML = `↩ Restore last round<small>${escHtml(info)}</small>`;
+  btn.style.display = '';
+}
+
+document.getElementById('restoreBtn').addEventListener('click', () => {
+  const last = readLastRound();
+  if (!last) return;
+  // Swap, so the round being replaced can be restored in turn
+  if (lobbySnapshot) localStorage.setItem('gct_lastround', JSON.stringify(lobbySnapshot));
+  else localStorage.removeItem('gct_lastround');
+  ROUND_KEYS.forEach(k => {
+    if (last.data[k] === null) localStorage.removeItem(k);
+    else localStorage.setItem(k, last.data[k]);
+  });
+  location.reload();
+});
+
 // ── LOBBY ──
 function holeOptionsFor(course) {
   const counts = Object.keys(COURSES)
@@ -1840,6 +1891,8 @@ function buildPartnerRows(wrap, rebuild) {
 }
 
 function openLobby() {
+  lobbySnapshot = hasRoundData() ? snapshotRound() : null;
+  buildRestoreBtn();
   // Doubled nine shows as 18
   lobbySecondRound = secondRound && eighteenIsDoubledNine(selectedCourse);
   // Rebuild course buttons
@@ -1928,6 +1981,10 @@ function updateLobbyStartBtn() {
 
 document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   if (!selectedCourse || !selectedHoles) return;
+  if (lobbySnapshot) {
+    localStorage.setItem('gct_lastround', JSON.stringify(lobbySnapshot));
+    lobbySnapshot = null;
+  }
   const hcpInput = document.getElementById('hcpInput');
   const v = parseInt(hcpInput.value, 10);
   hcp = isNaN(v) ? DEFAULT_HCP : Math.min(54, Math.max(0, v));
