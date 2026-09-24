@@ -6,6 +6,20 @@ const BUILTIN_PRESETS = PRESET_COURSES.filter(n => n !== 'Others');
 let userCourses = {};
 try { userCourses = JSON.parse(localStorage.getItem('gct_usercourses')) || {}; } catch (e) {}
 
+// Tees used to be { colour }. Renames it in courses saved on the phone, and in a courses.js
+// entry pasted from an older course submission.
+function renameOldTeeKey(course) {
+  let changed = false;
+  (course.tees || []).forEach(t => {
+    if ('colour' in t) { t.color = t.colour; delete t.colour; changed = true; }
+  });
+  return changed;
+}
+Object.values(COURSES).forEach(renameOldTeeKey);
+if (Object.values(userCourses).map(renameOldTeeKey).some(Boolean)) {
+  localStorage.setItem('gct_usercourses', JSON.stringify(userCourses));
+}
+
 function applyUserCourses() {
   Object.keys(COURSES).forEach(k => { if (!BUILTIN_COURSES.includes(k)) delete COURSES[k]; });
   const names = [];
@@ -26,7 +40,7 @@ function saveUserCourses() {
 applyUserCourses();
 
 // ── COURSE EDITOR ──
-// Draft: { name, note, holes: [{ par, si }], ratingPar, tees: [{ colour, players, sss, slope }], defaultTee }.
+// Draft: { name, note, holes: [{ par, si }], ratingPar, tees: [{ color, players, sss, slope }], defaultTee }.
 // Number fields hold the raw input strings until save.
 let courseDraft = null;
 let courseDraftKey = null; // key being edited, null for a new course
@@ -36,13 +50,13 @@ function openCourseEditor(key) {
   const c = key ? userCourses[key] : null;
   if (c) {
     const tees = c.tees
-      ? c.tees.map(t => ({ colour: t.colour, players: t.players || '', sss: String(t.sss), slope: String(t.slope) }))
-      : (c.sss != null ? [{ colour: 'Default', players: '', sss: String(c.sss), slope: String(c.slope) }] : []);
+      ? c.tees.map(t => ({ color: t.color, players: t.players || '', sss: String(t.sss), slope: String(t.slope) }))
+      : (c.sss != null ? [{ color: 'Default', players: '', sss: String(c.sss), slope: String(c.slope) }] : []);
     courseDraft = {
       name: key, note: c.note || '',
       holes: c.holes.map(h => ({ par: h.par, si: h.si == null ? '' : String(h.si) })),
       ratingPar: String(c.ratingPar ?? c.par),
-      tees, defaultTee: c.defaultTee || (tees[0] ? tees[0].colour : '')
+      tees, defaultTee: c.defaultTee || (tees[0] ? tees[0].color : '')
     };
   } else if (isCustomCourse(selectedCourse) && selectedCourse && selectedCourse !== 'Others') {
     // Start from name typed in course search
@@ -52,8 +66,8 @@ function openCourseEditor(key) {
       holes: Array.from({ length: n }, (_, i) => ({ par: customHolePars[i] || 4, si: '' })),
       ratingPar: '',
       tees: customSSS != null && customSlope != null
-        ? [{ colour: 'Default', players: '', sss: String(customSSS), slope: String(customSlope) }]
-        : [{ colour: 'Yellow', players: '', sss: '', slope: '' }],
+        ? [{ color: 'Default', players: '', sss: String(customSSS), slope: String(customSlope) }]
+        : [{ color: 'Yellow', players: '', sss: '', slope: '' }],
       defaultTee: customSSS != null && customSlope != null ? 'Default' : 'Yellow'
     };
   } else {
@@ -61,7 +75,7 @@ function openCourseEditor(key) {
       name: '', note: '',
       holes: Array.from({ length: 18 }, () => ({ par: 4, si: '' })),
       ratingPar: '',
-      tees: [{ colour: 'Yellow', players: '', sss: '', slope: '' }],
+      tees: [{ color: 'Yellow', players: '', sss: '', slope: '' }],
       defaultTee: 'Yellow'
     };
   }
@@ -85,11 +99,11 @@ function draftRatingPar() {
   return isNaN(v) ? Math.round(draftPar() * 18 / n) : v;
 }
 
-// Suggested tee names: the usual colours, then any other name a course already uses
-const COMMON_TEE_COLOURS = ['Black', 'White', 'Yellow', 'Blue', 'Red', 'Green', 'Orange', 'Purple', 'Gold', 'Silver'];
-function teeColourSuggestions() {
-  const used = Object.values(COURSES).flatMap(c => (c.tees || []).map(t => t.colour));
-  return [...new Set([...COMMON_TEE_COLOURS, ...used])].filter(c => c && c !== 'Default');
+// Suggested tee names: the usual colors, then any other name a course already uses
+const COMMON_TEE_COLORS = ['Black', 'White', 'Yellow', 'Blue', 'Red', 'Green', 'Orange', 'Purple', 'Gold', 'Silver'];
+function teeColorSuggestions() {
+  const used = Object.values(COURSES).flatMap(c => (c.tees || []).map(t => t.color));
+  return [...new Set([...COMMON_TEE_COLORS, ...used])].filter(c => c && c !== 'Default');
 }
 
 function buildCourseEditor() {
@@ -97,7 +111,7 @@ function buildCourseEditor() {
   const d = courseDraft;
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const n = d.holes.length;
-  const colours = [...new Set(d.tees.map(t => t.colour.trim()).filter(Boolean))];
+  const colors = [...new Set(d.tees.map(t => t.color.trim()).filter(Boolean))];
 
   body.innerHTML = `
     <div class="lobby-section">
@@ -132,7 +146,7 @@ function buildCourseEditor() {
         Add a row per tee, or per tee and men/ladies.</div>
       ${d.tees.map((t, i) => `
         <div class="ce-tee">
-          <input type="text" class="lobby-custom-input" data-tee="${i}" data-f="colour" value="${esc(t.colour)}" placeholder="Tee (e.g. Yellow)" list="ceTeeColours" autocomplete="off">
+          <input type="text" class="lobby-custom-input" data-tee="${i}" data-f="color" value="${esc(t.color)}" placeholder="Tee (e.g. Yellow)" list="ceTeeColors" autocomplete="off">
           <select class="lobby-custom-input" data-tee="${i}" data-f="players">
             ${[['', 'Everyone'], ['men', 'Men'], ['ladies', 'Ladies']].map(([v, l]) =>
               `<option value="${v}"${t.players === v ? ' selected' : ''}>${l}</option>`).join('')}
@@ -141,14 +155,14 @@ function buildCourseEditor() {
           <input type="number" step="1" class="lobby-custom-input" data-tee="${i}" data-f="slope" value="${esc(t.slope)}" placeholder="Slope">
           <button class="ce-remove" data-remove-tee="${i}" aria-label="Remove tee">×</button>
         </div>`).join('')}
-      <datalist id="ceTeeColours">
-        ${teeColourSuggestions().map(c => `<option value="${esc(c)}">`).join('')}
+      <datalist id="ceTeeColors">
+        ${teeColorSuggestions().map(c => `<option value="${esc(c)}">`).join('')}
       </datalist>
       <button class="course-tool-btn" id="ceAddTee">＋ Add tee</button>
-      ${colours.length > 1 ? `
+      ${colors.length > 1 ? `
         <div class="lobby-label" style="font-size:12px;margin-top:4px">Default tee</div>
         <select class="lobby-custom-input" data-f="defaultTee">
-          ${colours.map(c => `<option value="${esc(c)}"${d.defaultTee === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}
+          ${colors.map(c => `<option value="${esc(c)}"${d.defaultTee === c ? ' selected' : ''}>${esc(c)}</option>`).join('')}
         </select>` : ''}
     </div>
     ${n === 18 ? '' : `
@@ -171,8 +185,8 @@ function buildCourseEditor() {
       else if (f !== 'count') d[f] = el.value;
     });
   });
-  // Tee colours feed the default tee list
-  body.querySelectorAll('[data-f="colour"]').forEach(el => el.addEventListener('change', buildCourseEditor));
+  // Tee colors feed the default tee list
+  body.querySelectorAll('[data-f="color"]').forEach(el => el.addEventListener('change', buildCourseEditor));
   body.querySelector('[data-f="count"]').addEventListener('change', e => {
     setDraftHoleCount(parseInt(e.target.value, 10));
   });
@@ -191,7 +205,7 @@ function buildCourseEditor() {
     buildCourseEditor();
   }));
   document.getElementById('ceAddTee').addEventListener('click', () => {
-    d.tees.push({ colour: '', players: '', sss: '', slope: '' });
+    d.tees.push({ color: '', players: '', sss: '', slope: '' });
     buildCourseEditor();
   });
   document.getElementById('ceCopy').addEventListener('click', copyCourseSnippet);
@@ -228,17 +242,17 @@ function draftToEntry() {
     return { par: h.par, si };
   });
   const tees = d.tees.map((t, i) => {
-    const colour = t.colour.trim();
+    const color = t.color.trim();
     const sss = parseFloat(t.sss), slope = parseFloat(t.slope);
-    if (!colour) throw `Tee ${i + 1} needs a name, e.g. Yellow.`;
-    if (isNaN(sss) || sss < 40 || sss > 85) throw `${colour} tee: SSS should be an 18-hole rating, roughly 50 to 80.`;
-    if (isNaN(slope) || slope < 55 || slope > 155) throw `${colour} tee: slope must be between 55 and 155.`;
-    const tee = { colour };
+    if (!color) throw `Tee ${i + 1} needs a name, e.g. Yellow.`;
+    if (isNaN(sss) || sss < 40 || sss > 85) throw `${color} tee: SSS should be an 18-hole rating, roughly 50 to 80.`;
+    if (isNaN(slope) || slope < 55 || slope > 155) throw `${color} tee: slope must be between 55 and 155.`;
+    const tee = { color };
     if (t.players) tee.players = t.players;
     return Object.assign(tee, { sss, slope });
   });
-  const dupe = tees.find((t, i) => tees.findIndex(u => u.colour === t.colour && u.players === t.players) !== i);
-  if (dupe) throw `The ${dupe.colour} tee is listed twice.`;
+  const dupe = tees.find((t, i) => tees.findIndex(u => u.color === t.color && u.players === t.players) !== i);
+  if (dupe) throw `The ${dupe.color} tee is listed twice.`;
 
   const par = holes.reduce((s, h) => s + h.par, 0);
   const ratingPar = draftRatingPar();
@@ -249,8 +263,8 @@ function draftToEntry() {
     entry.sss = tees[0].sss;
     entry.slope = tees[0].slope;
   } else if (tees.length) {
-    const colours = tees.map(t => t.colour);
-    entry.defaultTee = colours.includes(d.defaultTee.trim()) ? d.defaultTee.trim() : colours[0];
+    const colors = tees.map(t => t.color);
+    entry.defaultTee = colors.includes(d.defaultTee.trim()) ? d.defaultTee.trim() : colors[0];
     entry.tees = tees;
   }
   entry.holes = holes;
@@ -265,7 +279,7 @@ function courseSnippet(name, c) {
   lines.push(`    par: ${c.par}${c.ratingPar != null ? `, ratingPar: ${c.ratingPar}` : ''},`);
   if (c.tees) {
     lines.push(`    defaultTee: ${q(c.defaultTee)},`, '    tees: [');
-    c.tees.forEach(t => lines.push(`      { colour: ${q(t.colour)}, ${t.players ? `players: ${q(t.players)}, ` : ''}sss: ${t.sss}, slope: ${t.slope} },`));
+    c.tees.forEach(t => lines.push(`      { color: ${q(t.color)}, ${t.players ? `players: ${q(t.players)}, ` : ''}sss: ${t.sss}, slope: ${t.slope} },`));
     lines.push('    ],');
   } else {
     lines.push(`    sss: ${c.sss ?? null}, slope: ${c.slope ?? null},`);

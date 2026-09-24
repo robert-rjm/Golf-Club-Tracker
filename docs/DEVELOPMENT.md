@@ -3,11 +3,11 @@
 How the app is put together, how to run your own copy, and the rules the scoring code must keep.
 For what the app does, see the [README](../README.md).
 
-## Licence
+## License
 
 The app is licensed under [CC BY-NC-SA 4.0](../LICENSE). You can run and change your own copy
 as long as it is **non-commercial**, **credits Robert Michels** with a link back to this
-repository, and is shared under the **same licence**.
+repository, and is shared under the **same license**.
 
 ## Running it
 
@@ -128,8 +128,8 @@ Each entry in `COURSES` (in `courses.js`) looks like this:
   par: 33, ratingPar: 66,
   defaultTee: 'Yellow',
   tees: [
-    { colour: 'Yellow', players: 'men',    sss: 64.4, slope: 110 },
-    { colour: 'Yellow', players: 'ladies', sss: 66.4, slope: 115 },
+    { color: 'Yellow', players: 'men',    sss: 64.4, slope: 110 },
+    { color: 'Yellow', players: 'ladies', sss: 66.4, slope: 115 },
   ],
   holes: [
     { par: 4, si: 4 },
@@ -146,7 +146,7 @@ Each entry in `COURSES` (in `courses.js`) looks like this:
   `ratingPar`; everything else uses `par`.
 - `si` is the stroke index, ranked 1..18 across the whole entry.
 - A course with a single rating can use top-level `sss` and `slope` instead of `tees`.
-  `players` (`'men'` or `'ladies'`) is only needed when a colour has different ratings for each.
+  `players` (`'men'` or `'ladies'`) is only needed when a color has different ratings for each.
 - A comment at the top says where the ratings came from, and which tee if it isn't obvious.
 
 The lobby's course list (`PRESET_COURSES`) is built from `COURSES`, so a new entry appears on its

@@ -27,4 +27,4 @@ function randomSecret() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
 }
 const formatCode = code => code.slice(0, 3) + '-' + code.slice(3);
-const normaliseCode = input => String(input).toUpperCase().replace(/[^A-Z0-9]/g, '');
+const normalizeCode = input => String(input).toUpperCase().replace(/[^A-Z0-9]/g, '');

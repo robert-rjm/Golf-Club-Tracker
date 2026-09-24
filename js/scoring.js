@@ -23,11 +23,11 @@ function withStartNine(courseObj) {
 // A tee entry with no `players` is rated for every category.
 function ratingFor(course, tee, players) {
   if (!course.tees || !course.tees.length) return { sss: course.sss, slope: course.slope };
-  const pick = (colour, cat) => course.tees.find(x =>
-    (!colour || x.colour === colour) && (!cat || !x.players || x.players === cat));
-  const colour = tee || course.defaultTee;
-  const t = pick(colour, players)
-         || pick(colour, null)
+  const pick = (color, cat) => course.tees.find(x =>
+    (!color || x.color === color) && (!cat || !x.players || x.players === cat));
+  const color = tee || course.defaultTee;
+  const t = pick(color, players)
+         || pick(color, null)
          || pick(course.defaultTee, players)
          || pick(course.defaultTee, null)
          || course.tees[0];

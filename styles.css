@@ -382,7 +382,7 @@
   }
   .sum-sec-hint { font-size: 10px; color: rgba(255,255,255,0.3); font-style: italic; }
 
-  /* Hole grid, coloured by score to par */
+  /* Hole grid, colored by score to par */
   .hole-grid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 6px;
   }
@@ -754,7 +754,7 @@
   .view-status:empty { display: none; }
   .view-intro, .view-intro-hint { display: none; }
 
-  /* Before a round is showing: code entry centred on the page */
+  /* Before a round is showing: code entry centered on the page */
   body.landing .view-top {
     min-height: calc(100vh - 68px); margin: 0;
     flex-direction: column; flex-wrap: nowrap; justify-content: center; gap: 14px;
