@@ -85,7 +85,7 @@ function buildSettingsUI() {
   // Putter note
   const note = document.createElement('div');
   note.className = 'settings-putter-note';
-  note.innerHTML = `<img class="logo-icon" src="Logo.png" alt=""> Putter is always included`;
+  note.innerHTML = `<img class="logo-icon" src="Logo-transparent.png" alt=""> Putter is always included`;
   scroll.appendChild(note);
 
   // Mid-round the bag is being adjusted, not chosen before teeing off

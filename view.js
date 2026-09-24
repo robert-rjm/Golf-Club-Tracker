@@ -141,7 +141,7 @@ function render() {
     </div>
     ${tabs}
     <div class="sum-section">
-      <div class="sum-sec-head"><span class="lobby-label"><img class="logo-icon" src="Logo.png" alt="">${esc(p.name)}${p.hcp !== null ? ` · HCP ${p.hcp}` : ''}</span><span class="sum-sec-hint">tap a hole for clubs</span></div>
+      <div class="sum-sec-head"><span class="lobby-label"><img class="logo-icon" src="Logo-transparent.png" alt="">${esc(p.name)}${p.hcp !== null ? ` · HCP ${p.hcp}` : ''}</span><span class="sum-sec-hint">tap a hole for clubs</span></div>
       <div class="hole-grid">${grid}</div>
     </div>
     <div class="sum-section"><div class="ov-stats">${stats}</div></div>
