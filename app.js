@@ -2291,9 +2291,8 @@ function allCourseNames() {
   return PRESET_COURSES.filter(n => n !== 'Others');
 }
 
-// Most played first, then most recent. Order in courses.js breaks ties, so it sets the
-// defaults before there's any history. Frequency over recency keeps buttons from shuffling
-// after a one-off away round.
+// Most played first, then most recent, then courses.js order. Frequency comes first so
+// a one-off away round doesn't reshuffle the buttons.
 function topCourses() {
   const names = allCourseNames();
   const stat = n => courseStats[n] || { n: 0, last: 0 };
@@ -2420,7 +2419,7 @@ function openCourseEditor(key) {
       tees, defaultTee: c.defaultTee || (tees[0] ? tees[0].colour : '')
     };
   } else if (isCustomCourse(selectedCourse) && selectedCourse && selectedCourse !== 'Others') {
-    // Start from what was typed under Others
+    // Start from name typed in course search
     const n = selectedHoles || customHolePars.length || 18;
     courseDraft = {
       name: selectedCourse, note: '',
