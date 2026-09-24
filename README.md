@@ -84,8 +84,10 @@ the par and stroke index of each hole, and the rating and slope for each tee, fo
 
 ## Running your own copy
 
-The app is a handful of static files with no build step. For the file layout, setting up live
-sharing with Supabase, and adding courses to the code, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+The app is a handful of static files with no build step. You're welcome to run your own copy
+for non-commercial use, crediting this project and keeping the same licence (see below). For
+the file layout, setting up live sharing with your own Supabase project, and adding courses
+to the code, see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## License
 [![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)

@@ -3,10 +3,26 @@
 How the app is put together, how to run your own copy, and the rules the scoring code must keep.
 For what the app does, see the [README](../README.md).
 
+## Licence
+
+The app is licensed under [CC BY-NC-SA 4.0](../LICENSE). You can run and change your own copy
+as long as it is **non-commercial**, **credits Robert Michels** with a link back to this
+repository, and is shared under the **same licence**.
+
 ## Running it
 
 There's no build step, no package manager and no test runner. Open `index.html` in a browser,
 or serve the folder from any static host (the live app is on GitHub Pages).
+
+### Your own copy
+
+Two settings point at this project's services. Change them before you publish a copy, or
+your copy's data ends up with this project:
+
+- `SUPABASE_URL` and `SUPABASE_KEY` at the top of `share.js`: set them to your own Supabase
+  project (see below), or empty them (`''`) to turn off live sharing and course submissions
+- `GITHUB_REPO` in `js/lobby.js`: the repository that **⬆ Suggest this course for the app**
+  opens an issue on
 
 Everything a player does is saved in the browser's `localStorage` under `gct_*` keys. There
 is no account or server copy. The only network calls are the optional Supabase ones below.
@@ -61,9 +77,10 @@ setting there too, or restoring the last round will lose it.
 
 ## Live sharing and course submissions
 
-Both need a free [Supabase](https://supabase.com) project. With `SUPABASE_URL` or
-`SUPABASE_KEY` left empty in `share.js`, the app works as normal and hides the Live Share
-section, the **📡 Follow a live round** button and course submissions.
+Both need a free [Supabase](https://supabase.com) project. `share.js` ships with this
+project's own URL and key filled in, so a copy has to replace them or empty them. With either
+one empty, the app works as normal and hides the Live Share section, the
+**📡 Follow a live round** button and course submissions.
 
 ### Setting up a project
 
