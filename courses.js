@@ -137,7 +137,7 @@ const COURSES = {
       { par: 3, si: 11 },
     ]
   },
-    'Chamonix': {
+  'Chamonix': {
     // https://www.golfdechamonix.com/en/introduction
     par: 72,
     defaultTee: 'Yellow',
@@ -171,6 +171,10 @@ const COURSES = {
   },
 };
 
-// Courses offered in the lobby. The first few are the buttons until there's play history,
-// the rest are found by search. Last entry should always be 'Others'.
-const PRESET_COURSES = ['Golfclub St Genis', 'Verbier Les Esserts', 'Ugolf Aravella Andorra', 'Grandvalira Golf Soldeu', 'Others'];
+// Courses offered in the lobby, built from COURSES in the order above: the first few are the
+// buttons until there's play history, the rest are found by search. A ' - N Hole' layout is
+// listed under its course. 'Others' stays last.
+const PRESET_COURSES = [
+  ...new Set(Object.keys(COURSES).map(k => k.replace(/\s*-\s*\d+\s*Hole$/i, ''))),
+  'Others'
+];

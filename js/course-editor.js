@@ -274,7 +274,7 @@ function copyCourseSnippet() {
   const btn = document.getElementById('ceCopy');
   navigator.clipboard.writeText(text).then(() => {
     err.textContent = '';
-    btn.textContent = '✓ Copied. Paste it into COURSES and add the name to PRESET_COURSES.';
+    btn.textContent = '✓ Copied. Paste it into COURSES in courses.js.';
   }, () => { err.textContent = 'Could not copy to the clipboard.'; });
 }
 

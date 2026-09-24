@@ -33,7 +33,7 @@ is no account or server copy. The only network calls are the optional Supabase o
 |------|---------------|
 | `index.html` | The app: hole screen, lobby, and the summary, settings and course-editor overlays |
 | `styles.css` | Styles for `index.html` and `view.html` |
-| `courses.js` | Built-in course data (`COURSES`) and the lobby's course list (`PRESET_COURSES`) |
+| `courses.js` | Built-in course data (`COURSES`), and the lobby's course list built from it (`PRESET_COURSES`) |
 | `share.js` | Supabase connection details and helpers, shared by the app and the live view |
 | `supabase.sql` | Tables and functions for the Supabase project |
 | `view.html` · `view.js` | Read-only live view of a shared round, opened with a code |
@@ -116,8 +116,7 @@ Every save in the course editor sends a submission, edits included.
 
 1. In **Table Editor → course_submissions**, take the newest row for the course
 2. Check the ratings against the source in the note, if there is one
-3. Paste its `snippet` into `COURSES` in `courses.js` and add the name to `PRESET_COURSES`
-   (see below)
+3. Paste its `snippet` into `COURSES` in `courses.js` (see below)
 
 ## Course data
 
@@ -150,8 +149,9 @@ Each entry in `COURSES` (in `courses.js`) looks like this:
   `players` (`'men'` or `'ladies'`) is only needed when a colour has different ratings for each.
 - A comment at the top says where the ratings came from, and which tee if it isn't obvious.
 
-Then add the course name to `PRESET_COURSES`, before `'Others'`, which must stay last. The first
-few names are the lobby's buttons until there's play history; the rest are found by search.
+The lobby's course list (`PRESET_COURSES`) is built from `COURSES`, so a new entry appears on its
+own. The order of the entries matters: the first few are the lobby's buttons until there's play
+history, and the rest are found by search.
 
 **Hole counts.** A course with an 18-hole entry offers 9 holes (front or back) as well. A course
 with only a 9-hole entry offers 18 by playing it twice. A different layout at the same club is
