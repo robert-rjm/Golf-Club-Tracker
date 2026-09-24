@@ -555,7 +555,7 @@ document.getElementById('undoBtn').addEventListener('click', () => {
 // Mode buttons are shared with the settings overlay.
 function trackOptionButtons(afterPick) {
   return [
-    { label: '⛳ Clubs & Shots', val: true,  sub: 'A club for every shot' },
+    { label: '<img class="logo-icon" src="Logo.png" alt="">Clubs & Shots', val: true,  sub: 'A club for every shot' },
     { label: '🔢 Score Only',   val: false, sub: 'Just a total per hole' }
   ].map(({ label, val, sub }) => {
     const btn = document.createElement('button');
