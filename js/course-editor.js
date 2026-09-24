@@ -85,6 +85,13 @@ function draftRatingPar() {
   return isNaN(v) ? Math.round(draftPar() * 18 / n) : v;
 }
 
+// Suggested tee names: the usual colours, then any other name a course already uses
+const COMMON_TEE_COLOURS = ['Black', 'White', 'Yellow', 'Blue', 'Red', 'Green', 'Orange', 'Purple', 'Gold', 'Silver'];
+function teeColourSuggestions() {
+  const used = Object.values(COURSES).flatMap(c => (c.tees || []).map(t => t.colour));
+  return [...new Set([...COMMON_TEE_COLOURS, ...used])].filter(c => c && c !== 'Default');
+}
+
 function buildCourseEditor() {
   const body = document.getElementById('courseEditBody');
   const d = courseDraft;
@@ -125,7 +132,7 @@ function buildCourseEditor() {
         Add a row per tee, or per tee and men/ladies.</div>
       ${d.tees.map((t, i) => `
         <div class="ce-tee">
-          <input type="text" class="lobby-custom-input" data-tee="${i}" data-f="colour" value="${esc(t.colour)}" placeholder="Tee (e.g. Yellow)">
+          <input type="text" class="lobby-custom-input" data-tee="${i}" data-f="colour" value="${esc(t.colour)}" placeholder="Tee (e.g. Yellow)" list="ceTeeColours" autocomplete="off">
           <select class="lobby-custom-input" data-tee="${i}" data-f="players">
             ${[['', 'Everyone'], ['men', 'Men'], ['ladies', 'Ladies']].map(([v, l]) =>
               `<option value="${v}"${t.players === v ? ' selected' : ''}>${l}</option>`).join('')}
@@ -134,6 +141,9 @@ function buildCourseEditor() {
           <input type="number" step="1" class="lobby-custom-input" data-tee="${i}" data-f="slope" value="${esc(t.slope)}" placeholder="Slope">
           <button class="ce-remove" data-remove-tee="${i}" aria-label="Remove tee">×</button>
         </div>`).join('')}
+      <datalist id="ceTeeColours">
+        ${teeColourSuggestions().map(c => `<option value="${esc(c)}">`).join('')}
+      </datalist>
       <button class="course-tool-btn" id="ceAddTee">＋ Add tee</button>
       ${colours.length > 1 ? `
         <div class="lobby-label" style="font-size:12px;margin-top:4px">Default tee</div>
