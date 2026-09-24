@@ -2247,17 +2247,13 @@ document.getElementById('friendsClose').addEventListener('click', closeFriends);
 function openLobby() {
   lobbySnapshot = hasRoundData() ? snapshotRound() : null;
   buildRestoreBtn();
+  document.getElementById('followLobbyBtn').style.display = shareEnabled() ? '' : 'none';
   // Doubled nine shows as 18
   lobbySecondRound = secondRound && eighteenIsDoubledNine(selectedCourse);
+  // 'Others' was the old placeholder for a course not yet named
+  if (selectedCourse === 'Others') selectedCourse = '';
   buildCourseOpts();
-
-  const customInput = document.getElementById('customCourse');
-  customInput.oninput = () => {
-    selectedCourse = customInput.value.trim() || 'Others';
-    buildHoleOpts(selectedCourse);
-    buildCourseTools();
-    updateLobbyStartBtn();
-  };
+  buildCourseSearch();
 
   // Hole buttons for the current course
   buildHoleOpts(selectedCourse);
@@ -2277,48 +2273,110 @@ function openLobby() {
   showOverlay('lobbyOverlay');
 }
 
+// ── COURSE PICKER ──
+// Rounds started per course, { name: { n, last } }, to rank the lobby buttons
+let courseStats = {};
+try { courseStats = JSON.parse(localStorage.getItem('gct_coursestats')) || {}; } catch (e) {}
+
+function recordCoursePlayed(name) {
+  const s = courseStats[name] || { n: 0, last: 0 };
+  courseStats[name] = { n: s.n + 1, last: Date.now() };
+  localStorage.setItem('gct_coursestats', JSON.stringify(courseStats));
+}
+
+const COURSE_BUTTONS = 4;
+
+// Every course in the list, built-in and saved, by base name
+function allCourseNames() {
+  return PRESET_COURSES.filter(n => n !== 'Others');
+}
+
+// Most played first, then most recent. Order in courses.js breaks ties, so it sets the
+// defaults before there's any history. Frequency over recency keeps buttons from shuffling
+// after a one-off away round.
+function topCourses() {
+  const names = allCourseNames();
+  const stat = n => courseStats[n] || { n: 0, last: 0 };
+  return [...names]
+    .sort((a, b) => stat(b).n - stat(a).n || stat(b).last - stat(a).last || names.indexOf(a) - names.indexOf(b))
+    .slice(0, COURSE_BUTTONS);
+}
+
+function selectCourse(name) {
+  selectedCourse = name;
+  customHolePars = [];
+  customSSS      = null;
+  customSlope    = null;
+  selectedStart  = null;
+  saveState();
+  const search = document.getElementById('courseSearch');
+  search.value = '';
+  buildCourseResults();
+  buildCourseOpts();
+  buildHoleOpts(selectedCourse);
+  updateLobbyStartBtn();
+}
+
 function buildCourseOpts() {
   const courseOpts = document.getElementById('courseOpts');
   courseOpts.innerHTML = '';
-  PRESET_COURSES.forEach(name => {
+  const names = topCourses();
+  // The selection always has a button, even when found by search or typed in
+  if (selectedCourse && !names.includes(selectedCourse)) names.push(selectedCourse);
+  names.forEach(name => {
     const btn = document.createElement('button');
     btn.className = 'lobby-opt' + (selectedCourse === name ? ' sel' : '');
     btn.textContent = name;
-    btn.addEventListener('click', () => {
-      selectedCourse = name;
-      customHolePars = [];
-      customSSS      = null;
-      customSlope    = null;
-      selectedStart  = null;
-      saveState();
-      courseOpts.querySelectorAll('.lobby-opt').forEach(b => b.classList.remove('sel'));
-      btn.classList.add('sel');
-      const customInput = document.getElementById('customCourse');
-      if (name === 'Others') {
-        customInput.style.display = 'block';
-        customInput.focus();
-        selectedCourse = customInput.value.trim() || 'Others';
-      } else {
-        customInput.style.display = 'none';
-      }
-      buildHoleOpts(selectedCourse);
-      buildCourseTools();
-      updateLobbyStartBtn();
-    });
+    btn.addEventListener('click', () => selectCourse(name));
     courseOpts.appendChild(btn);
   });
-
-  const customInput = document.getElementById('customCourse');
-  if (selectedCourse === 'Others' || !PRESET_COURSES.slice(0,-1).includes(selectedCourse)) {
-    const othersBtn = [...courseOpts.querySelectorAll('.lobby-opt')].find(b => b.textContent === 'Others');
-    if (othersBtn) othersBtn.classList.add('sel');
-    customInput.style.display = 'block';
-    customInput.value = PRESET_COURSES.includes(selectedCourse) ? '' : selectedCourse;
-  } else {
-    customInput.style.display = 'none';
-    customInput.value = '';
-  }
   buildCourseTools();
+}
+
+const foldName = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+function buildCourseSearch() {
+  const search = document.getElementById('courseSearch');
+  search.value = '';
+  search.oninput = buildCourseResults;
+  // Enter picks the first row
+  search.onkeydown = e => {
+    if (e.key !== 'Enter') return;
+    const first = document.querySelector('#courseResults .course-result');
+    if (first) { e.preventDefault(); first.click(); search.blur(); }
+  };
+  buildCourseResults();
+}
+
+// Matching courses, then play or save the typed name when nothing matches it exactly
+function buildCourseResults() {
+  const wrap = document.getElementById('courseResults');
+  const typed = document.getElementById('courseSearch').value.trim();
+  wrap.innerHTML = '';
+  if (!typed) { wrap.style.display = 'none'; return; }
+  const q = foldName(typed);
+  const matches = allCourseNames().filter(n => foldName(n).includes(q)).slice(0, 6);
+  const row = (html, onClick, extra = '') => {
+    const btn = document.createElement('button');
+    btn.className = 'course-result' + extra;
+    btn.innerHTML = html;
+    btn.addEventListener('click', onClick);
+    wrap.appendChild(btn);
+  };
+  matches.forEach(name => {
+    const s = courseStats[name];
+    const played = s ? `<small>${s.n} round${s.n === 1 ? '' : 's'}</small>` : '';
+    row(`${escHtml(name)}${played}`, () => selectCourse(name));
+  });
+  if (!matches.some(n => foldName(n) === q)) {
+    row(`Play “${escHtml(typed)}” without saving<small>enter pars for this round</small>`,
+      () => selectCourse(typed), ' course-result-new');
+    row(`＋ Save “${escHtml(typed)}” as a course<small>pars, stroke index and ratings</small>`, () => {
+      selectCourse(typed);
+      openCourseEditor(null);
+    }, ' course-result-new');
+  }
+  wrap.style.display = '';
 }
 
 // "New course" plus an edit button for each saved entry of the selected course
@@ -2369,8 +2427,9 @@ function openCourseEditor(key) {
       holes: Array.from({ length: n }, (_, i) => ({ par: customHolePars[i] || 4, si: '' })),
       ratingPar: '',
       tees: customSSS != null && customSlope != null
-        ? [{ colour: 'Default', players: '', sss: String(customSSS), slope: String(customSlope) }] : [],
-      defaultTee: 'Default'
+        ? [{ colour: 'Default', players: '', sss: String(customSSS), slope: String(customSlope) }]
+        : [{ colour: 'Yellow', players: '', sss: '', slope: '' }],
+      defaultTee: customSSS != null && customSlope != null ? 'Default' : 'Yellow'
     };
   } else {
     courseDraft = {
@@ -2677,6 +2736,7 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
   round = Array.from({length: HOLES}, () => []);
   getSimplePlayers().forEach(p => { p.round = Array(HOLES).fill(null); });
   hole  = 1;
+  recordCoursePlayed(selectedCourse);
   hideOverlay('lobbyOverlay');
   saveState();
   buildStrip();
@@ -2728,6 +2788,15 @@ function buildSettingsUI() {
     showOverlay('friendsOverlay');
   });
   scroll.appendChild(friendsGroup);
+
+  if (shareEnabled()) {
+    // Your own round stays saved on the phone while you watch another
+    const liveGroup = document.createElement('div');
+    liveGroup.className = 'settings-group';
+    liveGroup.innerHTML = `<div class="settings-group-title">Live</div>
+      <a class="follow-btn" href="view.html?app=1">📡 Follow another round</a>`;
+    scroll.appendChild(liveGroup);
+  }
 
   Object.entries(ALL_CLUBS).forEach(([groupName, clubs]) => {
     const group = document.createElement('div');

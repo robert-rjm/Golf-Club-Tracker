@@ -3,7 +3,9 @@
 const REFRESH_MS = 30000;
 const PLAYER_COLORS = ['#c9a84c', '#5fb0c9', '#e0973c', '#8fbf5f', '#d1637a', '#8a7fd6'];
 
-let code = normaliseCode(new URLSearchParams(location.search).get('code') || '');
+const params = new URLSearchParams(location.search);
+let code = normaliseCode(params.get('code') || '');
+const fromApp = params.has('app'); // opened from the phone app, so offer the way back
 let round = null, updatedAt = null, playerIdx = 0, refreshTimer = null;
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
@@ -49,7 +51,7 @@ function readPlayer(p) {
 async function load() {
   clearTimeout(refreshTimer);
   if (!shareEnabled()) { setStatus('Live sharing is not set up yet.'); return; }
-  if (!code) { setStatus('Enter the code shown in the round summary on the phone.'); return; }
+  if (!code) { setStatus(''); return; }
   if (!round) setStatus('Loading…');
   try {
     const res = await supabaseRpc('get_round', { p_code: code });
@@ -78,6 +80,8 @@ function tileClass(h) {
 
 function render() {
   const out = document.getElementById('viewRound');
+  // Code entry sits in the middle of the page until a round is showing
+  document.body.classList.toggle('landing', !round);
   if (!round) { out.innerHTML = ''; return; }
   const players = (Array.isArray(round.players) ? round.players : []).map(readPlayer);
   if (!players.length) { out.innerHTML = ''; return; }
@@ -161,16 +165,34 @@ document.getElementById('viewRound').addEventListener('click', e => {
   }
 });
 
-document.getElementById('codeForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const next = normaliseCode(document.getElementById('codeInput').value);
-  if (next.length !== 6) { setStatus('A code has 6 characters, e.g. GX7-42K.'); return; }
+function showCode(next) {
   code = next;
   round = null;
   playerIdx = 0;
-  history.replaceState(null, '', `?code=${formatCode(code)}`);
+  history.replaceState(null, '', `?${fromApp ? 'app=1&' : ''}code=${formatCode(code)}`);
   load();
+}
+
+const codeInput = document.getElementById('codeInput');
+
+// Formats as XXX-XXX while typing and loads as soon as the sixth character is in
+codeInput.addEventListener('input', () => {
+  const c = normaliseCode(codeInput.value).slice(0, 6);
+  codeInput.value = c.length > 3 ? formatCode(c) : c;
+  if (c.length === 6 && c !== code) showCode(c);
 });
 
-if (code) document.getElementById('codeInput').value = formatCode(code);
+document.getElementById('codeForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const next = normaliseCode(codeInput.value);
+  if (next.length !== 6) { setStatus('A code has 6 characters, e.g. GX7-42K.'); return; }
+  showCode(next);
+});
+
+if (code) codeInput.value = formatCode(code);
+if (fromApp) {
+  const back = document.querySelector('.view-brand');
+  back.textContent = '‹ Back to my round';
+  back.classList.add('view-back');
+}
 load();
