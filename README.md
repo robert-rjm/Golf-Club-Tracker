@@ -47,6 +47,10 @@ before and the Live Share section stays hidden.
 The key is safe to publish: the rounds table can only be reached through the functions in
 `supabase.sql`, and only the phone that created a code can update or delete it.
 
+Courses saved in the app's course editor are also sent to the same project. The app can only add
+them, not read them: find them in **Table Editor → course_submissions** and paste the `snippet`
+column into `courses.js`.
+
 ## Supported Courses
 
 Course data (par, stroke index, and SSS/slope per tee) is stored in `courses.js`. Currently includes:

@@ -81,6 +81,7 @@
       <div class="lobby-label">Course</div>
       <div class="lobby-opts" id="courseOpts"></div>
       <input type="text" class="lobby-custom-input" id="customCourse" placeholder="Enter course name…" style="display:none">
+      <div class="course-tools" id="courseTools"></div>
     </div>
     <div class="lobby-section">
       <div class="lobby-label">Holes</div>
@@ -106,6 +107,18 @@
     <div class="lobby-section" id="playersLobby"></div>
   </div>
   <button class="lobby-start-btn" id="lobbyStartBtn" disabled>Select a course &amp; holes to start →</button>
+</div>
+
+<!-- Course editor, opened from the lobby -->
+<div class="overlay" id="courseEditOverlay" style="z-index:110">
+  <div class="ov-head">
+    <div class="ov-title" id="courseEditTitle">New Course</div>
+    <button class="ov-close" id="courseEditClose">×</button>
+  </div>
+  <div class="lobby-scroll" id="courseEditBody"></div>
+  <div class="ce-error" id="courseEditError"></div>
+  <button class="settings-start-btn" id="courseEditSave">Save course</button>
+  <button class="ce-delete" id="courseEditDelete" style="display:none">Delete course</button>
 </div>
 
 <!-- Summary overlay -->
@@ -150,6 +163,16 @@
   </div>
   <div class="settings-scroll" id="settingsScroll"></div>
   <button class="settings-start-btn" id="startRoundBtn">Start Round →</button>
+</div>
+
+<!-- Friends overlay -->
+<div class="overlay" id="friendsOverlay">
+  <div class="ov-head">
+    <div class="ov-title">Friends</div>
+    <button class="ov-close" id="friendsClose">‹</button>
+  </div>
+  <div class="settings-scroll" id="friendsScroll"></div>
+  <button class="settings-start-btn" id="friendsAddBtn">+ Add friend</button>
 </div>
 
 <script src="courses.js"></script>
