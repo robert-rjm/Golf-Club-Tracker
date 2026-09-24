@@ -439,6 +439,24 @@
 
   .leaderboard { margin-bottom: 6px; }
 
+  /* Live share */
+  .share-code {
+    font-family: 'Bebas Neue', sans-serif; font-size: 44px; letter-spacing: 6px;
+    color: var(--gold-bright); text-align: center; line-height: 1.1;
+  }
+  .share-hint { font-size: 11px; color: var(--cream-dim); text-align: center; margin: 4px 0 10px; word-break: break-all; }
+  .share-actions { display: flex; gap: 8px; }
+  .share-btn {
+    flex: 1; width: 100%;
+    background: rgba(201,168,76,0.1); border: 1px solid var(--border-gold);
+    border-radius: 12px; color: var(--gold);
+    font-family: 'Karla', sans-serif; font-size: 14px; font-weight: 700;
+    padding: 12px; cursor: pointer;
+  }
+  .share-btn:active { background: rgba(201,168,76,0.22); }
+  .share-btn:disabled { opacity: 0.6; }
+  .share-stop { background: rgba(176,48,32,0.1); border-color: rgba(176,48,32,0.3); color: #e07060; }
+
   /* Detail sheet over the summary */
   .sum-sheet {
     position: absolute; inset: 0; z-index: 2; display: none;
@@ -684,3 +702,35 @@
   .footnote a:hover {
     text-decoration: underline;
   }
+
+  /* ── LIVE VIEW PAGE ── */
+  html.view, html.view body { height: auto; overflow: auto; }
+  .view-wrap {
+    position: relative; z-index: 1;
+    max-width: 720px; margin: 0 auto; padding: 20px 16px 48px;
+  }
+  .view-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .view-brand {
+    font-family: 'Bebas Neue', sans-serif; font-size: 24px; letter-spacing: 2px;
+    color: var(--gold); text-decoration: none;
+  }
+  .view-form { display: flex; gap: 8px; flex: 1; max-width: 340px; min-width: 240px; }
+  .view-form .lobby-custom-input { flex: 1; padding: 10px 12px; text-transform: uppercase; }
+  .view-form .share-btn { flex: 0 0 auto; width: auto; padding: 10px 18px; }
+  .view-status { font-size: 13px; color: var(--cream-dim); margin-bottom: 12px; }
+  .view-status:empty { display: none; }
+  .view-head { margin-bottom: 14px; }
+  .view-meta { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--cream-dim); margin-top: 4px; }
+  .view-live { width: 8px; height: 8px; border-radius: 50%; background: var(--turf); box-shadow: 0 0 0 3px rgba(77,143,65,0.25); }
+  .view-stat { flex: 1 1 18%; min-width: 96px; cursor: default; }
+  .view-stat::after { content: none; }
+  .view-table-wrap { overflow-x: auto; }
+  .view-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .view-table th, .view-table td {
+    padding: 6px 8px; text-align: center; white-space: nowrap;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .view-table th { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--gold); font-weight: 700; }
+  .view-table .pts { color: var(--gold); }
+  .view-table tr.now td { background: rgba(201,168,76,0.1); }
+  .view-table tr.total td { font-weight: 700; border-top: 1px solid var(--border-gold); }

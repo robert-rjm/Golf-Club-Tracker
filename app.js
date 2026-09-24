@@ -210,6 +210,7 @@ function saveState() {
   localStorage.setItem('gct_customslope', customSlope ?? '');
   localStorage.setItem('gct_trackclubs',  trackClubs ? '1' : '');
   localStorage.setItem('gct_players', JSON.stringify(players));
+  scheduleShareSync();
 }
 function loadState() {
   const savedRound      = localStorage.getItem('gct_round');
@@ -1179,6 +1180,7 @@ document.getElementById('sumBtn').addEventListener('click', () => {
   closeSheet();
   buildPlayerSwitch();
   renderSummaryFor(0);
+  renderShareSection();
 
   const existingLb = document.querySelector('#summaryOverlay .leaderboard');
   if (existingLb) existingLb.remove();
@@ -1298,6 +1300,125 @@ document.getElementById('copyBtn').addEventListener('click', () => {
   });
 });
 
+// ── LIVE SHARE ──
+// While a code is active, every save is pushed to Supabase (see share.js, supabase.sql)
+// Declared so saveState can call scheduleShareSync before this section has run
+var shareTimer = null;
+function shareCode()   { return localStorage.getItem('gct_sharecode'); }
+function shareSecret() { return localStorage.getItem('gct_sharesecret'); }
+const shareUrl = code => new URL(`view.html?code=${formatCode(code)}`, location.href).href;
+const clockTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+// Scored per player on the phone, so the web page only has to display it
+function sharePayload() {
+  return {
+    v: 1,
+    course: selectedCourse || null,
+    hole,
+    trackClubs,
+    players: players.map((p, idx) => {
+      const d = buildSummaryData(idx);
+      return {
+        name: p.name,
+        hcp: d.isDetailed ? hcp : p.hcp,
+        ph: d.cd ? d.ph : null,
+        holes: d.holes.map(h => ({
+          par: h.par,
+          gross: h.gross || null,
+          pts: h.pts,
+          shots: h.shots && h.shots.length ? h.shots : null
+        }))
+      };
+    })
+  };
+}
+
+function setShareStatus(text) {
+  document.getElementById('shareStatus').textContent = text;
+}
+
+async function pushShare() {
+  const code = shareCode();
+  if (!code) return;
+  try {
+    const ok = await supabaseRpc('share_round', { p_code: code, p_secret: shareSecret(), p_data: sharePayload() });
+    setShareStatus(ok ? `synced ${clockTime()}` : 'code rejected');
+  } catch (e) {
+    setShareStatus('offline, will retry');
+  }
+}
+
+function scheduleShareSync() {
+  if (!shareEnabled() || !shareCode()) return;
+  clearTimeout(shareTimer);
+  shareTimer = setTimeout(pushShare, 2000);
+}
+window.addEventListener('online', scheduleShareSync);
+
+function renderShareSection() {
+  const section = document.getElementById('ovShareSection');
+  section.style.display = shareEnabled() ? '' : 'none';
+  if (!shareEnabled()) return;
+  const code = shareCode();
+  document.getElementById('ovShare').innerHTML = code
+    ? `<div class="share-code">${formatCode(code)}</div>
+       <div class="share-hint">${escHtml(shareUrl(code))}</div>
+       <div class="share-actions">
+         <button class="share-btn" data-share="link">Share link</button>
+         <button class="share-btn share-stop" data-share="stop">Stop sharing</button>
+       </div>`
+    : `<button class="share-btn" data-share="start">Get a live code</button>
+       <div class="share-hint">Anyone with the code can follow this round on the web</div>`;
+  if (!code) setShareStatus('');
+}
+
+async function startSharing(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Creating code…';
+  const secret = randomSecret();
+  try {
+    // Retry on the rare code that's already taken
+    for (let i = 0; i < 3; i++) {
+      const code = randomCode();
+      if (await supabaseRpc('share_round', { p_code: code, p_secret: secret, p_data: sharePayload() })) {
+        localStorage.setItem('gct_sharecode', code);
+        localStorage.setItem('gct_sharesecret', secret);
+        renderShareSection();
+        setShareStatus(`synced ${clockTime()}`);
+        return;
+      }
+    }
+  } catch (e) {}
+  btn.disabled = false;
+  btn.textContent = 'No connection, try again';
+}
+
+async function stopSharing() {
+  if (!confirm('Stop sharing? The code will stop working.')) return;
+  try {
+    await supabaseRpc('unshare_round', { p_code: shareCode(), p_secret: shareSecret() });
+  } catch (e) {
+    alert("Couldn't reach the server. Try again when you have signal.");
+    return;
+  }
+  localStorage.removeItem('gct_sharecode');
+  localStorage.removeItem('gct_sharesecret');
+  renderShareSection();
+}
+
+document.getElementById('ovShare').addEventListener('click', e => {
+  const btn = e.target.closest('[data-share]');
+  if (!btn) return;
+  const action = btn.dataset.share;
+  if (action === 'start') startSharing(btn);
+  if (action === 'stop') stopSharing();
+  if (action === 'link') {
+    const url = shareUrl(shareCode());
+    if (navigator.share) navigator.share({ title: 'Live round', url }).catch(() => {});
+    else navigator.clipboard.writeText(url).then(() => { btn.textContent = '✓ Link copied'; });
+  }
+});
+
 // ── NEW ROUND ──
 let newRoundPending = false;
 document.getElementById('newRoundBtn').addEventListener('click', () => {
@@ -1328,7 +1449,7 @@ const ROUND_KEYS = [
   'gct_round', 'gct_hole', 'gct_holes', 'gct_selectedholes', 'gct_secondround',
   'gct_selectednine', 'gct_secondnine', 'gct_selectedstart', 'gct_selectedtee',
   'gct_course', 'gct_hcp', 'gct_custompars', 'gct_customsss', 'gct_customslope',
-  'gct_trackclubs', 'gct_players'
+  'gct_trackclubs', 'gct_players', 'gct_sharecode', 'gct_sharesecret'
 ];
 let lobbySnapshot = null; // round in progress when the lobby opened
 
@@ -1985,6 +2106,9 @@ document.getElementById('lobbyStartBtn').addEventListener('click', () => {
     localStorage.setItem('gct_lastround', JSON.stringify(lobbySnapshot));
     lobbySnapshot = null;
   }
+  // A new round gets its own code
+  localStorage.removeItem('gct_sharecode');
+  localStorage.removeItem('gct_sharesecret');
   const hcpInput = document.getElementById('hcpInput');
   const v = parseInt(hcpInput.value, 10);
   hcp = isNaN(v) ? DEFAULT_HCP : Math.min(54, Math.max(0, v));

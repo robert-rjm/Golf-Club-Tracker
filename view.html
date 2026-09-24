@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en" class="view">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClubTrack Live</title>
+<link rel="icon" href="Logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="view-wrap">
+  <div class="view-top">
+    <a class="view-brand" href="index.html">⛳ ClubTrack</a>
+    <form class="view-form" id="codeForm">
+      <input class="lobby-custom-input" id="codeInput" placeholder="Round code, e.g. GX7-42K" autocomplete="off" autocapitalize="characters" maxlength="8">
+      <button class="share-btn" type="submit">Show</button>
+    </form>
+  </div>
+  <div class="view-status" id="viewStatus"></div>
+  <div id="viewRound"></div>
+</div>
+
+<script src="share.js"></script>
+<script src="view.js"></script>
+</body>
+</html>

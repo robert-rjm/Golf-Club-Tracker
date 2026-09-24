@@ -21,6 +21,11 @@ Log the club behind every shot or just keep track of your score. One phone keeps
 - Either tracking the club behind every shot, providing the most insights, with **Clubs & Shots**.
 - Or alternatively, to only track the totals per hole, with the **Score Only** option.
 
+**Follow a round from anywhere.** In the round summary, tap **Get a live code** to share the
+round. Anyone can enter the code (e.g. `GX7-42K`) on the [live view page](https://robert-rjm.github.io/Golf-Club-Tracker/view.html)
+to see the scorecard, Stableford points and clubs per hole, updating as the round is played.
+Codes stop working 30 days after the last update, or straight away with **Stop sharing**.
+
 ## Usage
 
 For the best experience, add it to your home screen. Works also in any mobile browser.
@@ -28,6 +33,19 @@ For the best experience, add it to your home screen. Works also in any mobile br
 1. Open the [live app](https://robert-rjm.github.io/Golf-Club-Tracker/) in your browser
 2. Tap **Share → Add to Home Screen**
 3. Opens as a standalone app with no browser chrome
+
+## Live sharing setup
+
+Live codes need a free [Supabase](https://supabase.com) project. Without one the app works as
+before and the Live Share section stays hidden.
+
+1. Create a Supabase project
+2. In **SQL Editor**, run [`supabase.sql`](supabase.sql)
+3. From **Project Settings → API**, copy the project URL and the publishable (anon) key into
+   `SUPABASE_URL` and `SUPABASE_KEY` at the top of [`share.js`](share.js)
+
+The key is safe to publish: the rounds table can only be reached through the functions in
+`supabase.sql`, and only the phone that created a code can update or delete it.
 
 ## Supported Courses
 
