@@ -39,6 +39,7 @@ is no account or server copy. The only network calls are the optional Supabase o
 | `view.html` · `view.js` | Read-only live view of a shared round, opened with a code |
 | `courses.html` | Public list of the built-in courses and their tees, read from `courses.js`. The README links to it, so it never needs editing |
 | `manifest.json` | Web app manifest, so Chrome and Edge offer to install the app. Only works when served over HTTPS, not from `file://` |
+| `sw.js` | Service worker, registered from `js/main.js`. Stores the app's files on the device so it opens offline, and still loads fresh files whenever there's a connection. **Add any new file the app loads to `APP_FILES`**, or it won't be there offline |
 | `Logo.png` | Solid-background logo: browser-tab, home-screen and installed-app icon, README header. iOS fills a transparent home-screen icon with black, and GitHub's light theme would hide the white ball |
 | `Logo-transparent.png` | Transparent logo used inside the app (lobby, header, labels) and the live view |
 | `js/` | The app's code, split by screen (below) |

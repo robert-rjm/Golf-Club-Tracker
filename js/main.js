@@ -13,3 +13,8 @@ if (roundStarted()) {
   render();
   openLobby();
 }
+
+// Offline support (sw.js). Fails quietly from file://, where service workers can't run.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
