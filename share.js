@@ -1,8 +1,8 @@
 // Live round sharing through Supabase, used by index.html and view.html.
 // Fill in from Supabase: Project Settings → API. The publishable (anon) key is meant to be
 // public; the table is only reachable through the functions in supabase.sql.
-const SUPABASE_URL = '';
-const SUPABASE_KEY = '';
+const SUPABASE_URL = 'https://rtzewnwviszidnbobsdz.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_EOsCT7vRJhYoPIkn2hbJxA_5VFIWtrp';
 
 const shareEnabled = () => Boolean(SUPABASE_URL && SUPABASE_KEY);
 
